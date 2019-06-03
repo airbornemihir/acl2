@@ -7586,8 +7586,9 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
 ; See community book books/misc/misc2/misc.lisp for justification.
   (values (floor i j))
   #+acl2-loop-only
-  (if (or (= (nfix j) 0)
-          (< (ifix i) j))
+  (if (mbe :logic (or (= (nfix j) 0)
+                      (< (ifix i) j))
+           :exec (< i j))
       0
     (+ 1 (nonnegative-integer-quotient (- i j) j))))
 
