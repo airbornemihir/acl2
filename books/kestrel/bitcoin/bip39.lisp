@@ -13,6 +13,7 @@
 
 (include-book "kestrel/crypto/interfaces/pbkdf2-hmac-sha-512" :dir :system)
 (include-book "kestrel/crypto/interfaces/sha-256" :dir :system)
+(include-book "kestrel/std/util/deffixer" :dir :system)
 (include-book "kestrel/utilities/bits-and-bytes-as-digits" :dir :system)
 (include-book "kestrel/utilities/bits-and-ubyte11s-as-digits" :dir :system)
 (include-book "kestrel/utilities/xdoc/defxdoc-plus" :dir :system)
@@ -25,7 +26,7 @@
 
 (defxdoc+ bip39
   :parents (bitcoin)
-  :short "Bitcion Improvement Proposal (BIP) 39."
+  :short "Bitcoin Improvement Proposal (BIP) 39."
   :long
   (xdoc::topstring
    (xdoc::p
@@ -53,9 +54,8 @@
   (128 160 192 224 256)
   :short "Possible sizes of the entropy in bits."
   :long
-  "<p>
-   These are the possible values of @('ENT') in the table in [BIP39].
-   </p>")
+  (xdoc::topstring-p
+   "These are the possible values of @('ENT') in the table in [BIP39]."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -78,18 +78,11 @@
          t)
     :no-function t)
 
-  (define bip39-entropy-fix ((x bip39-entropyp))
-    :returns (fixed-x bip39-entropyp)
+  (std::deffixer bip39-entropy-fix
+    :pred bip39-entropyp
+    :body-fix (repeat 128 0)
     :parents (bip39-entropy)
-    :short "Fixer for @(tsee bip39-entropy)."
-    (mbe :logic (if (bip39-entropyp x) x (repeat 128 0))
-         :exec x)
-    :no-function t
-    ///
-    (defrule bip39-entropy-fix-when-bip39-entropyp
-      (implies (bip39-entropyp x)
-               (equal (bip39-entropy-fix x)
-                      x))))
+    :short "Fixer for @(tsee bip39-entropy).")
 
   (fty::deffixtype bip39-entropy
     :pred bip39-entropyp
@@ -331,22 +324,22 @@
      It accepts any string as mnemonic, as well as any string as passphrase.
      More precisely, there are (large) limits on the lengths of these strings,
      dictated by the limits on the password and salt inputs of "
-    (xdoc::seeurl "crypto::pbkdf2-hmac-sha-512-interface"
+    (xdoc::seetopic "crypto::pbkdf2-hmac-sha-512-interface"
                   "@('pbkdf2-hmac-sha-512')")
     ", which we add as guards:
      the limit on the mnemonic
      (which is used as password of "
-    (xdoc::seeurl "crypto::pbkdf2-hmac-sha-512-interface"
+    (xdoc::seetopic "crypto::pbkdf2-hmac-sha-512-interface"
                   "@('pbkdf2-hmac-sha-512')")
     ") is the same as the one on the password of "
-    (xdoc::seeurl "crypto::pbkdf2-hmac-sha-512-interface"
+    (xdoc::seetopic "crypto::pbkdf2-hmac-sha-512-interface"
                   "@('pbkdf2-hmac-sha-512')")
     ": the limit on the passphrase
      (which is used as salt of "
-    (xdoc::seeurl "crypto::pbkdf2-hmac-sha-512-interface"
+    (xdoc::seetopic "crypto::pbkdf2-hmac-sha-512-interface"
                   "@('pbkdf2-hmac-sha-512')")
     ") is the same as the one on the text of "
-    (xdoc::seeurl "crypto::pbkdf2-hmac-sha-512-interface"
+    (xdoc::seetopic "crypto::pbkdf2-hmac-sha-512-interface"
                   "@('pbkdf2-hmac-sha-512')")
     " dimished by 8 to account for
      the appended string constant ``@('mnemonic')''."))

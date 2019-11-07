@@ -19,7 +19,8 @@
   :input-size-limit (expt 2 64)
   :output-size 256
   :parents (interfaces)
-  :short "SHA-256 interface."
+  :short (xdoc::topstring
+          "SHA-256 " (xdoc::seetopic "interfaces" "interface") ".")
   :long
   (xdoc::topstring
    (xdoc::p
@@ -33,7 +34,13 @@
      or less than @($2^{61}$) bytes.")
    (xdoc::p
     "According to FIPS PUB 180-4,
-     the output of SHA-256 is a sequence of exactly 256 bits, or 32 bytes.")))
+     the output of SHA-256 is a sequence of exactly 256 bits, or 32 bytes.")
+   (xdoc::p
+    "See also:"
+    (xdoc::ul
+     (xdoc::li (xdoc::seetopic "sha2::sha-2" "SHA-256 executable specification"))
+     (xdoc::li (xdoc::seetopic "sha-256-attachment" "attaching SHA-256 executable specification to this interface"))))
+   ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

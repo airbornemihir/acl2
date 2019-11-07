@@ -2903,16 +2903,20 @@
 
 (defun untranslate-and (p q iff-flg)
 
-; The following theorem illustrates the various cases:
-; (thm (and (equal (and t q) q)
-;           (iff (and p t) p)
-;           (equal (and p (and q1 q2)) (and p q1 q2))))
+; The following theorem illustrates the theorem:
+
+; (thm (equal (and p (and q1 q2)) (and p q1 q2)))
+
+; We formerly also gave special treatment corresponding to the cases (equal
+; (and t q) q) and (iff (and p t) p).  But we stopped doing so after
+; Version_8.2, when Stephen Westfold pointed out the confusion arising in the
+; proof-builder after rewriting a subterm, tst, to t, in a term (and tst x2),
+; i.e., (if tst x2 'nil).  A similar problem occurs for (and x2 tst).
 
 ; Warning: Keep this in sync with and-addr.
 
-  (cond ((eq p t) q)
-        ((and iff-flg (eq q t)) p)
-        ((and (consp q)
+  (declare (ignore iff-flg))
+  (cond ((and (consp q)
               (eq (car q) 'and))
          (cons 'and (cons p (cdr q))))
         (t (list 'and p q))))
@@ -4282,19 +4286,117 @@
 ; The following two functions could go in axioms.lisp, but it seems not worth
 ; putting them in :logic mode so we might as well put them here.
 
+(defmacro set-print-clause-ids (flg)
+  (declare (xargs :guard (member-equal flg '(t 't nil 'nil))))
+  (let ((flg (if (atom flg)
+                 (list 'quote flg)
+               flg)))
+    `(f-put-global 'print-clause-ids ,flg state)))
+
+(defmacro set-saved-output (save-flg inhibit-flg)
+  (let ((save-flg-original save-flg)
+        (save-flg (if (and (consp save-flg)
+                           (eq (car save-flg) 'quote))
+                      (cadr save-flg)
+                    save-flg))
+        (inhibit-flg-original inhibit-flg)
+        (inhibit-flg (if (and (consp inhibit-flg)
+                              (eq (car inhibit-flg) 'quote))
+                         (cadr inhibit-flg)
+                       inhibit-flg)))
+    `(prog2$
+      (and (gag-mode)
+           (er hard 'set-saved-output
+               "It is illegal to call set-saved-output explicitly while ~
+                gag-mode is active.  First evaluate ~x0."
+               '(set-gag-mode nil)))
+      (pprogn ,(cond ((eq save-flg t)
+                      '(f-put-global 'saved-output-token-lst :all state))
+                     ((null save-flg)
+                      '(f-put-global 'saved-output-token-lst nil state))
+                     ((true-listp save-flg)
+                      `(f-put-global 'saved-output-token-lst ',save-flg state))
+                     (t (er hard 'set-saved-output
+                            "Illegal first argument to set-saved-output (must ~
+                             be ~x0 or a true-listp): ~x1."
+                            t save-flg-original)))
+              ,(if (eq inhibit-flg :same)
+                   'state
+                 `(f-put-global 'inhibit-output-lst
+                                ,(cond ((eq inhibit-flg t)
+                                        '(add-to-set-eq 'prove
+                                                        (f-get-global
+                                                         'inhibit-output-lst
+                                                         state)))
+                                       ((eq inhibit-flg :all)
+                                        '(set-difference-eq
+                                          *valid-output-names*
+                                          (set-difference-eq
+                                           '(error warning!)
+                                           (f-get-global
+                                            'inhibit-output-lst
+                                            state))))
+                                       ((eq inhibit-flg :normal)
+                                        ''(proof-tree))
+                                       ((true-listp inhibit-flg)
+                                        (list 'quote inhibit-flg))
+                                       (t (er hard 'set-saved-output
+                                              "Illegal second argument to ~
+                                               set-saved-output (must be ~v0, ~
+                                               or a true-listp): ~x1."
+                                              '(t :all :normal :same)
+                                              inhibit-flg-original)))
+                                state))))))
+
+(defun set-gag-mode-fn (action state)
+
+; Warning: Keep this in sync with with-output-fn, in particular with respect to
+; the legal values for action and for the state-global-let* generated there.
+
+  (let ((action (if (and (consp action)
+                         (consp (cdr action))
+                         (eq (car action) 'quote))
+                    (cadr action)
+                  action)))
+    (pprogn
+     (f-put-global 'gag-mode nil state) ; to allow set-saved-output
+     (case action
+       ((t)
+        (pprogn (set-saved-output t :same)
+                (f-put-global 'gag-mode action state)
+                (set-print-clause-ids nil)))
+       (:goals
+        (pprogn (set-saved-output t :same)
+                (f-put-global 'gag-mode action state)
+                (set-print-clause-ids t)))
+       ((nil)
+        (pprogn ; (f-put-global 'gag-mode nil state) ; already done
+         (set-saved-output nil :same)
+         (set-print-clause-ids nil)))
+       (otherwise
+        (prog2$ (er hard 'set-gag-mode
+                    "Unknown set-gag-mode argument, ~x0"
+                    action)
+                state))))))
+
+(defmacro set-gag-mode (action)
+  `(set-gag-mode-fn ,action state))
+
 (defun pop-inhibit-output-lst-stack (state)
   (let ((stk (f-get-global 'inhibit-output-lst-stack state)))
     (cond ((null stk) state)
           (t (pprogn (f-put-global 'inhibit-output-lst
-                                   (car stk)
+                                   (caar stk)
                                    state)
+                     (set-gag-mode (cdar stk))
                      (f-put-global 'inhibit-output-lst-stack
                                    (cdr stk)
                                    state))))))
 
 (defun push-inhibit-output-lst-stack (state)
   (f-put-global 'inhibit-output-lst-stack
-                (cons (f-get-global 'inhibit-output-lst state)
+                (cons (cons (f-get-global 'inhibit-output-lst state)
+                            (f-get-global 'gag-mode state))
                       (f-get-global 'inhibit-output-lst-stack state))
                 state))
 

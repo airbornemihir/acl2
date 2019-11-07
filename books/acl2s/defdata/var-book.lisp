@@ -29,6 +29,7 @@ is accepted by ACL2s, but this is not
 (include-book "defdata-core")
 (include-book "random-state")
 (include-book "enumerators-gen")
+(include-book "defdata-util")
 
 (include-book "library-support")
 
@@ -97,9 +98,11 @@ is accepted by ACL2s, but this is not
 (encapsulate 
  nil
  (local
-  (include-book "arithmetic-5/top" :dir :system))
+  (include-book "arithmetic-5/top" :dir :system)))
 
-  (verify-termination nth-var-char-builtin))
+(set-ignore-ok t)
+(verify-termination nth-var-char-builtin)
+(set-ignore-ok nil)
 
 ; generate a char-list-aux from a list of nats
 (defun get-var-char-list-aux-from-positions (l)
@@ -180,16 +183,75 @@ is accepted by ACL2s, but this is not
 
 (defun varp (x)
   (declare (xargs :guard t))
-  (b* (((unless (symbolp x)) nil)
-       ((when (keywordp x)) nil)
-       ((unless (acl2::legal-variablep x)) nil)
+  (b* (((unless (legal-variablep x)) nil)
        (name (symbol-name x))
        (clist (coerce name 'list)))
       (var-char-listp clist)))
         
 (register-type var :predicate varp :enumerator nth-var-builtin) 
 
+(defthm legal-variable-is-symbol
+  (and (implies (legal-variablep x)
+                (symbolp x)))
+  :hints (("goal" :in-theory (enable legal-variable-or-constant-namep)))
+  :rule-classes (:compound-recognizer
+                 :forward-chaining))
+
+(defthm legal-variable-disjoint-with-keys
+  (implies (keywordp x)
+           (not (legal-variablep x)))
+  :hints (("goal" :in-theory (enable legal-variable-or-constant-namep)))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(defthm legal-variable-disjoint-with-bool
+  (implies (booleanp x)
+           (not (legal-variablep x)))
+  :hints (("goal" :in-theory (enable legal-variable-or-constant-namep)))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(defthm legal-variable-disjoint-with-legal-constant
+  (implies (legal-constantp x)
+           (not (legal-variablep x)))
+  :hints (("goal" :in-theory (enable legal-variable-or-constant-namep)))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(in-theory (disable legal-variablep legal-constantp))
+
 (defthm var-symbolp
   (implies (varp x)
            (symbolp x))
+  :hints (("goal" :in-theory (enable legal-variable-or-constant-namep)))
   :rule-classes ((:compound-recognizer) (:forward-chaining)))
+
+(defthm var-legal-variablep
+  (implies (varp x)
+           (legal-variablep x))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(defthm legal-variablep-proper-symbolp
+  (implies (legal-variablep x)
+           (defdata::proper-symbolp x))
+  :hints (("goal" :in-theory (e/d (defdata::proper-symbolp)
+                                  (keywordp))))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(in-theory (disable varp))
+
+(defthm var-disjoint-with-keys
+  (implies (keywordp x)
+           (not (varp x)))
+  :hints (("goal" :in-theory (e/d () (keywordp))))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(defthm var-disjoint-with-bool
+  (implies (booleanp x)
+           (not (varp x)))
+  :hints (("goal" :in-theory (enable legal-variable-or-constant-namep)))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+
+(defthm var-proper-symbolp
+  (implies (varp x)
+           (defdata::proper-symbolp x))
+  :hints (("goal" :in-theory (enable defdata::proper-symbolp)))
+  :rule-classes ((:rewrite :backchain-limit-lst 1)))
+

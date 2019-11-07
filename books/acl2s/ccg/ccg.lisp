@@ -22,6 +22,17 @@
  (include-book "hacking/all" :dir :system :ttags :all))
 (subsume-ttags-since-defttag)
 
+; From ACL2 source file defthm.lisp, utilities.lisp
+(defun fix-pkg (pkg)
+  (declare (xargs :guard (and (or (null pkg) (stringp pkg))
+                              (not (equal pkg "")))))
+  (if (and pkg (not (equal pkg *main-lisp-package-name*)))
+      pkg
+    "ACL2"))
+
+(defmacro fix-intern$ (name pkg)
+  `(intern$ ,name (fix-pkg ,pkg)))
+
 ;;; Legacy doc strings replaced Nov. 2014 by the corresponding
 ;;; auto-generated defxdoc form in the last part of this file.
 
@@ -4759,11 +4770,12 @@ e2-e1+1.
                               (stringp pkg)
                               (natp i)
                               (plist-worldp wrld))))
-  (let ((name (intern$ (coerce (append char-lst
-                                       `(#\_)
-                                       (explode-nonnegative-integer i 10 nil))
-                               'string)
-                       pkg)))
+  (let ((name (fix-intern$
+               (coerce (append char-lst
+                               `(#\_)
+                               (explode-nonnegative-integer i 10 nil))
+                       'string)
+               pkg)))
     (cond ((new-namep name wrld) (mv name i))
           (t (ccg-counter-example-fn-name1 char-lst pkg (1+ i) wrld)))))
 
@@ -5955,11 +5967,21 @@ e2-e1+1.
            (let ((subset (access justification justification :subset))
                  (ccms-lst (fetch-dcl-field :consider-only-ccms
                                             (butlast (cddr def) 1))))
-             (if (and (consp ccms-lst)
-                      (null (cdr ccms-lst))
-                      (?-ccm-lstp (car ccms-lst))
-                      (set-equalp-eq (all-vars1-lst (car ccms-lst) nil)
-                                     subset))
+
+; Pete: Fri Aug 16 EDT 2019: Added the (null ccms-lst) case
+; below. This seems reasonable because we know that the existing
+; measured subset works, and this defun is not claiming some different
+; measured subset, so there's no difference between the case we're in
+; and the case where the user identified the exact justification in
+; the world. I need to come back to this later to make sure I'm not
+; missing something.
+               
+             (if (or (null ccms-lst)
+                     (and (consp ccms-lst)
+                          (null (cdr ccms-lst))
+                          (?-ccm-lstp (car ccms-lst))
+                          (set-equalp-eq (all-vars1-lst (car ccms-lst) nil)
+                                         subset)))
                  'redundant
                (msg "A redundant definition using CCG termination must use ~
                      the xarg :consider-only-ccms to declare a list of CCMs ~

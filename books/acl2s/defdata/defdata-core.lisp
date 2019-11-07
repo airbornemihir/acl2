@@ -25,6 +25,7 @@ data last modified: [2017-06-26 Mon]
 (include-book "tools/templates" :dir :system)
 (include-book "defdata-util")
 (include-book "builtin-combinators")
+
 ;defines defdata-defaults table and the behavior of builtin combinators
 
 (program) ; we are not going to prove anything about these functions
@@ -125,13 +126,16 @@ B is the builtin combinator table."
 (defloop funcalls-append (fs args wrld)
   (for ((f in fs)) (append (funcall-w f args 'defdata-events wrld))))
 
+#|
+Does not seem to be used.
+
 (defun satisfies-terms (xvar kwd-alist)
   (b* ((satisfies-exprs (get-all :satisfies kwd-alist))
        (satisfies-exprs (filter-terms-with-vars satisfies-exprs (list 'acl2s::x)))
        (satisfies-exprs (acl2::subst xvar 'acl2s::x satisfies-exprs))
        (satisfies-exprs (flatten-ANDs satisfies-exprs)))
     satisfies-exprs))
-
+|#
 
 ;Generate predicate events
 
@@ -153,8 +157,13 @@ B is the builtin combinator table."
        (B (table-alist 'builtin-combinator-table wrld))
        (kwd-alist (append kwd-alist top-kwd-alist))
 
+       (pkg (get1 :current-package kwd-alist))
+       (v (acl2s::fix-intern$ "V" pkg))
+
        (avoid-lst (append (forbidden-names) (strip-cars N)))
-       (xvar (if (member-eq 'v avoid-lst) 'v (acl2::generate-variable 'v avoid-lst nil nil wrld)))
+       (xvar (if (member-eq v avoid-lst)
+                 v
+               (acl2::generate-variable v avoid-lst nil nil wrld)))
        (pred-body (make-pred-I ndef xvar kwd-alist A M C B wrld))
        (pred-decls (make-pred-declare-forms xvar kwd-alist))
        (pred-name (predicate-name name A M))
@@ -191,9 +200,13 @@ B is the builtin combinator table."
        (B (table-alist 'builtin-combinator-table wrld))
        (kwd-alist (append kwd-alist top-kwd-alist))
        (avoid-lst (append (forbidden-names) (strip-cars N)))
-       (xvar (if (member-eq 'v avoid-lst) 'v (acl2::generate-variable 'v avoid-lst nil nil wrld)))
+       (v (acl2s::fix-intern$ "V" curr-pkg))
+
+       (xvar (if (member-eq v avoid-lst)
+                 v
+               (acl2::generate-variable v avoid-lst nil nil wrld)))
        (pred-body (make-pred-I ndef xvar kwd-alist A M C B wrld)))
-    `((defthm ,(s+ name "P-TESTTHM")
+    `((defthm ,(s+ name "P-TESTTHM" :pkg curr-pkg)
         (equal (,pred-name ,xvar)
                ,pred-body)
         :rule-classes nil
@@ -350,51 +363,96 @@ B is the builtin combinator table."
    (register-type-events1 ps kwd-alist wrld)))
 
 
-
 ; TOP-LEVEL EVENT GENERATION
 
-(defun defdata-events (a1 wrld)
+(defun defdata-core-events (a1 wrld)
   (b* (((list D kwd-alist) a1)) ;a1 is the result of parse-defdata
-
     `(WITH-OUTPUT
       :ON (SUMMARY ERROR) :OFF (PROVE EVENT OBSERVATION)
       :SUMMARY (ACL2::FORM ACL2::TIME)
       (PROGN
        ,@(collect-events :pre-events D kwd-alist)
        ,@(funcalls-append (get1 :pre-hook-fns kwd-alist) (list D kwd-alist wrld) wrld)
-       (ENCAPSULATE nil
-         (LOGIC)
-         (WITH-OUTPUT :SUMMARY (ACL2::FORM) :ON (ERROR)
-           (PROGN
-;             (acl2::acl2s-defaults :set acl2::testing-enabled ,(get1 :testing-enabled kwd-alist))
-             (SET-BOGUS-DEFUN-HINTS-OK T)
-             (SET-IGNORE-OK T)
-             (SET-IRRELEVANT-FORMALS-OK t)
-             ;(local (in-theory (disable . ,disable-rules)))
-             ;(local (in-theory (enable . ,enable-rules)))
+       (ENCAPSULATE
+        nil
+        (LOGIC)
+        (WITH-OUTPUT
+         :SUMMARY (ACL2::FORM) :ON (ERROR)
+         (PROGN
+          ;;(acl2::acl2s-defaults :set acl2::testing-enabled ,(get1 :testing-enabled kwd-alist))
+          (SET-BOGUS-DEFUN-HINTS-OK T)
+          (SET-IGNORE-OK T)
+          (SET-IRRELEVANT-FORMALS-OK t)
+          ;; (local (in-theory (disable . ,disable-rules)))
+          ;; (local (in-theory (enable . ,enable-rules)))
+          
+          ,@(predicate-events D kwd-alist wrld)
+          ;; ,@(tau-characterization-events D kwd-alist wrld)
+          ;; ,@(polymorphic-inst-defdata-events D kwd-alist wrld)
 
-             ,@(predicate-events D kwd-alist wrld)
-
-
-;             ,@(tau-characterization-events D kwd-alist wrld)
-;             ,@(polymorphic-inst-defdata-events D kwd-alist wrld)
-             ;; Run the above commented out generation functions as post-pred-hooks
-
-
-
-             ;; ,@(enumerator-events D kwd-alist wrld)
-             ;; ,@(enumerator/acc-events D kwd-alist wrld)
-             ;; ,@(fixer-events D kwd-alist wrld)
-             ,@(funcalls-append (get1 :cgen-hook-fns kwd-alist)
-                                (list D kwd-alist wrld) wrld)
-
-
-             )))
+          ;; Run the above commented out generation functions as post-pred-hooks
+          ;; ,@(enumerator-events D kwd-alist wrld)
+          ;; ,@(enumerator/acc-events D kwd-alist wrld)
+          ;; ,@(fixer-events D kwd-alist wrld)
+          ,@(funcalls-append (get1 :cgen-hook-fns kwd-alist)
+                             (list D kwd-alist wrld) wrld))))
        ,@(register-type-events D kwd-alist wrld)
        ,@(funcalls-append (get1 :post-hook-fns kwd-alist) (list D kwd-alist wrld) wrld)
-       ,@(collect-events :post-events D kwd-alist)
-       ))))
+       ,@(collect-events :post-events D kwd-alist)))))
 
+(logic)
+
+(defun match-alist (name key val A)
+  (declare (xargs :guard (and (symbolp name) (eqlable-2-alistp A))))
+  (if (endp A)
+      nil
+    (b* ((lookup (assoc key (cdar A)))
+         ((unless lookup)
+          (match-alist name key val (cdr A)))
+         (Aval (cdr lookup))
+         (Aname (caar A))
+         (nval (acl2::subst Aname name val)))
+      (if (equal Aval nval)
+          Aname
+        (match-alist name key val (cdr A))))))
+
+#|
+(defun match-alist (name key val A)
+  (declare (xargs :guard (and (symbolp name) (eqlable-2-alistp A))))
+  (if (endp A)
+      nil
+    (b* ((Aval (get1 key (cdar A)))
+         (Aname (caar A))
+         (nval (acl2::subst Aname name val)))
+      (if (equal Aval nval)
+          Aname
+        (match-alist name key val (cdr A))))))
+|#
+
+(program)
+
+#|
+Example use
+
+(match-alist :DEF '(listof acl2s::nat)
+             (type-metadata-table (w state)))
+|#
+
+(defun defdata-events (a1 wrld)
+  (b* (((list D kwd-alist) a1) ;a1 is the result of parse-defdata
+       (d-alist (cdar d))
+       (name (get1 'name d-alist))
+       (odef (get1 'odef (cdar d)))
+       (pdef (get1 'pdef (cdar d)))
+       (ndef (get1 'ndef (cdar d)))
+       (do-not-alias? (get1 :do-not-alias kwd-alist))
+       (M (type-metadata-table wrld))
+       (match-def (match-alist name :DEF odef M))
+       (match-def (or match-def (match-alist name :PRETTYIFIED-DEF pdef M)))
+       (match-def (or match-def (match-alist name :NORMALIZED-DEF ndef M))))
+    (if (and match-def (not do-not-alias?))
+        `(defdata-alias ,name ,match-def)
+      (defdata-core-events a1 wrld))))
 
 ; PARSING
 
@@ -531,7 +589,20 @@ B is the builtin combinator table."
 (defun parse-texp (texp tnames ctx wrld)
   (b* ((texp (base-alias-type texp (table-alist 'type-alias-table wrld))))
     (cond ((possible-constant-value-p texp)
-           (if (quotep texp) texp (kwote texp)))
+           ;; Pete: replaced this code because when normalizing (lisof x) we now
+           ;; generate (or nil (cons ...)) but when normalizing (or nil (cons
+           ;; ...)) we generate (or 'nil (cons ...)) and then these are not
+           ;; considered equivalent, so I'm going to remove quotes since that
+           ;; seems like the cleanest way of doing things
+           ;; (if (quotep texp) texp (kwote texp)))
+           (if (and (quotep texp)
+                    (or (booleanp (second texp))
+                        (characterp (second texp))
+                        (stringp (second texp))
+                        (acl2-numberp (second texp))
+                        (keywordp (second texp))))
+               (second texp)
+             texp))
           ((proper-symbolp texp) texp)
           ((not (true-listp texp)) ;name decl
            (cons (base-alias-type (car texp) (table-alist 'type-alias-table wrld))
@@ -720,7 +791,7 @@ B is the builtin combinator table."
 
        ;; (kwd-val-list (append kwd-val-list args))
        ((mv kwd-alist ?rest)
-        (extract-keywords ctx *per-def-keywords* kwd-val-list '()))
+        (extract-keywords ctx *per-def-keywords* kwd-val-list '() nil))
 
        ;; check if names are not nested and are unique
        (N (collect-names-texp
@@ -772,7 +843,7 @@ B is the builtin combinator table."
 ; specially handle allp aliases
        (allp-alias-events
         (and (proper-symbolp nbody) (is-allp-alias nbody wrld)
-             `((table allp-aliases ',(predicate-name tname A new-types) ',tname :put))))
+             `((table allp-aliases-table ',(predicate-name tname A new-types) ',tname :put))))
        (kwd-alist (put-assoc-eq
                    :post-pred-events
                    (append (get1 :post-pred-events kwd-alist) allp-alias-events)
@@ -822,7 +893,8 @@ B is the builtin combinator table."
             :debug :print-commentary :print-summary :time-track
             ;; :pre-pred-hook-fns :post-pred-hook-fns
             ;; :pre-hook-fns :post-hook-fns
-            :testing-enabled)
+            :testing-enabled
+            :do-not-alias)
           '(:hints :verbose)
           *per-def-keywords*
           ))
@@ -838,7 +910,8 @@ B is the builtin combinator table."
       (defaults-alst (table-alist 'defdata-defaults-table wrld)) ;TODO chek
       (defaults-alst (remove1-assoc-eq-lst (evens kwd-val-list) defaults-alst))
       ((mv kwd-alist rest-args)
-       (extract-keywords ctx *defdata-keywords* kwd-val-list defaults-alst))
+       (extract-keywords
+        ctx *defdata-keywords* kwd-val-list defaults-alst nil))
       (acl2-defaults-tbl (table-alist 'acl2::acl2-defaults-table wrld))
       (current-termination-method-entry
        (assoc :termination-method acl2-defaults-tbl))
@@ -876,7 +949,7 @@ B is the builtin combinator table."
 
     (list (parse-data-defs (list d) tnames args curr-pkg ctx wrld) kwd-alist)))
 
-
+#|
 (defmacro defdata (&rest args)
   (b* ((verbosep (let ((lst (member :verbose args)))
                    (and lst (cadr lst)))))
@@ -889,23 +962,48 @@ B is the builtin combinator table."
        (make-event
         (defdata-events
           (parse-defdata ',args (current-package state) (w state)) (w state)))))))
+|#
 
-(defun make-subsumes-relation-name (T1 T2)
+(defmacro defdata (&rest args)
+  (b* ((verbosep (let ((lst (member :verbose args)))
+                   (and lst (cadr lst)))))
+    `(with-output
+      ,@(and (not verbosep) '(:off :all :on (summary error) :summary (acl2::form acl2::time)))
+      :gag-mode t :stack :push
+      (encapsulate
+       nil
+       (with-output
+        ,@(and (not verbosep) '(:off :all))
+        :gag-mode t
+        :stack :push
+        (make-event
+         (defdata-events
+           (parse-defdata ',args (current-package state) (w state)) (w state))))))))
+  
+(defun make-subsumes-relation-name (T1 T2 curr-pkg)
   (let* ((str1 (symbol-name T1))
         (str2 (symbol-name T2))
         (str11 (string-append str1 "-IS-SUBTYPE-OF-"))
         (str (string-append str11 str2)))
-    (intern$ str "DEFDATA")))
+    (acl2s::fix-intern$ str curr-pkg)))
 
-(defun make-disjoint-relation-name (T1 T2)
+(defun make-disjoint-relation-name (T1 T2 curr-pkg)
   (let* ((str1 (symbol-name T1))
          (str2 (symbol-name T2))
          (str11 (string-append str1 "-IS-DISJOINT-WITH-"))
          (str (string-append str11 str2)))
-    (intern$ str "DEFDATA")))
+    (acl2s::fix-intern$ str curr-pkg)))
+
+(defun make-equal-relation-name (T1 T2 curr-pkg)
+  (let* ((str1 (symbol-name T1))
+         (str2 (symbol-name T2))
+         (str11 (string-append str1 "-IS-EQUAL-TO-"))
+         (str (string-append str11 str2)))
+    (acl2s::fix-intern$ str curr-pkg)))
 
 ;COPIED FROM DEFDATA ----- to be deprecated and deleted
-(defun compute-defdata-relation (T1 T2 hints rule-classes strictp otf-flg ctx wrld)
+(defun compute-defdata-relation
+    (T1 T2 hints rule-classes strictp otf-flg ctx curr-pkg wrld)
   (b* ((M (table-alist 'type-metadata-table wrld))
        (A (table-alist 'type-alias-table wrld))
        (T1 (base-alias-type T1 A))
@@ -916,17 +1014,25 @@ B is the builtin combinator table."
                      (assoc-eq T2 M)))
 ;if not existing typenames raise error
         (er hard ctx  "~|One of ~x0 and ~x1 is not a defined type!~%" T1 T2))
+       (x (acl2s::fix-intern$ "X" curr-pkg))
 
 ;; ((when (and rule-classes
 ;;                    (or (eq T1 'ACL2::ALL)
 ;;                        (eq T2 'ACL2::ALL))))
 ;; ;if not existing typenames raise error
 ;;         (er hard ctx  "~|Subtype/disjoint relation not allowed on predicate ALL with non-empty rule-classes~%"))
-       (rule-classes (if (or (is-allp-alias T1p wrld)
-                             (is-allp-alias T2p wrld))
-                         '()
+       (rule-classes
+        (cond ((or (is-allp-alias T1p wrld)
+                   (is-allp-alias T2p wrld)
+                   (equal T1p T2p))
+               '())
+              ((eq ctx 'defdata-equal)
+               `((:rewrite)
+                 (:tau-system :corollary (implies (,T1p ,x) (,T2p ,x)))
+                 (:tau-system :corollary (implies (,T2p ,x) (,T1p ,x)))))
+              (t rule-classes)))
+
 ; force not to be a tau-rule bcos tau complains
-                          rule-classes))
 #|
 PETE: removed this to force the generation of rules
 because the rule-classes may matter.
@@ -937,12 +1043,16 @@ because the rule-classes may matter.
                        (subtype-p T1p T2p wrld))))
           '(value-triple :redundant))
 |#
-       (form (if (eq ctx 'defdata-disjoint)
-                 `(implies (,T1p x) (not (,T2p x)))
-               `(implies (,T1p x) (,T2p x))))
-       (nm (if (eq ctx 'defdata-disjoint)
-               (make-disjoint-relation-name T1 T2)
-             (make-subsumes-relation-name T1 T2)))
+       (form (cond ((eq ctx 'defdata-disjoint)
+                    `(implies (,T1p ,x) (not (,T2p ,x))))
+                   ((eq ctx 'defdata-subtype)
+                    `(implies (,T1p ,x) (,T2p ,x)))
+                   (t `(equal (,T1p ,x) (,T2p ,x)))))
+       (nm (cond ((eq ctx 'defdata-disjoint)
+                  (make-disjoint-relation-name T1 T2 curr-pkg))
+                 ((eq ctx 'defdata-subtype)
+                  (make-subsumes-relation-name T1 T2 curr-pkg))
+                 (t (make-equal-relation-name T1 T2 curr-pkg))))
        (defthm-form `(defthm ,nm
                        ,form
                        :hints ,hints
@@ -984,9 +1094,15 @@ because the rule-classes may matter.
     :stack :push
     (make-event
      (compute-defdata-relation
-      ',T1 ',T2
-      ',hints ',rule-classes ',strictp ',otf-flg
-      'defdata::defdata-subtype (w state)))))
+      ',T1
+      ',T2
+      ',hints
+      ',rule-classes
+      ',strictp
+      ',otf-flg
+      'defdata::defdata-subtype
+      (current-package state)
+      (w state)))))
 
 (defmacro defdata-disjoint
     (T1
@@ -1005,9 +1121,42 @@ because the rule-classes may matter.
     :stack :push
     (make-event
      (compute-defdata-relation
-      ',T1 ',T2
-      ',hints ',rule-classes ',strictp ',otf-flg
-      'defdata::defdata-disjoint (w state)))))
+      ',T1
+      ',T2
+      ',hints
+      ',rule-classes
+      ',strictp
+      ',otf-flg
+      'defdata::defdata-disjoint
+      (current-package state)
+      (w state)))))
+
+(defmacro defdata-equal
+    (T1
+     T2
+     &key (rule-classes '((:tau-system)))
+     strictp
+     verbose
+     hints
+     otf-flg)
+  (declare (xargs :guard (and (proper-symbolp T1)
+                              (proper-symbolp T2))))
+  `(with-output
+    ,@(and (not verbose)
+           '(:off (warning warning! observation prove proof-builder
+                           event history summary proof-tree)))
+    :stack :push
+    (make-event
+     (compute-defdata-relation
+      ',T1
+      ',T2
+      ',hints
+      ',rule-classes
+      ',strictp
+      ',otf-flg
+      'defdata::defdata-equal
+      (current-package state)
+      (w state)))))
 
 (defmacro defdata-subtype-strict
     (T1
@@ -1035,6 +1184,22 @@ because the rule-classes may matter.
   (declare (xargs :guard (and (proper-symbolp T1)
                               (proper-symbolp T2))))
   `(defdata-disjoint ,T1 ,T2
+     :rule-classes ,rule-classes
+     :strictp t
+     :verbose ,verbose
+     :hints ,hints
+     :otf-flg ,otf-flg))
+
+(defmacro defdata-equal-strict
+    (T1
+     T2
+     &key (rule-classes '((:tau-system)))
+     verbose
+     hints
+     otf-flg)
+  (declare (xargs :guard (and (proper-symbolp T1)
+                              (proper-symbolp T2))))
+  `(defdata-equal ,T1 ,T2
      :rule-classes ,rule-classes
      :strictp t
      :verbose ,verbose
@@ -1144,6 +1309,55 @@ because the rule-classes may matter.
 
 ; :trans1 (defdatas-subtype (pos nat integer rational))
 ; :trans1 (defdatas-subtype-strict (pos nat integer rational))
+
+(defun defdatas-equal-fn
+    (L rule-classes strictp verbose hints otf-flg)
+  (if (endp (cdr L))
+      nil
+    (cons `(defdata-equal ,(car L) ,(second L)
+             :rule-classes ,rule-classes
+             :strictp ,strictp
+             :verbose ,verbose
+             :hints ,hints
+             :otf-flg ,otf-flg)
+          (defdatas-equal-fn (cdr L) rule-classes strictp
+            verbose hints otf-flg))))
+
+; Check that L1 = L2 = ... = Ln, where = is equality and
+; Li is the ith element of L.
+(defmacro defdatas-equal 
+    (L
+     &key (rule-classes '((:tau-system) (:forward-chaining)))
+     strictp
+     verbose
+     hints
+     otf-flg)
+  (declare (xargs :guard (proper-symbol-listp L)))
+  `(with-output
+    ,@(and (not verbose)
+           '(:off (warning warning! observation prove proof-builder
+                           event history summary proof-tree)))
+    :stack :push
+    (encapsulate
+     ()
+     ,@(defdatas-equal-fn L rule-classes strictp verbose hints otf-flg))))
+
+(defmacro defdatas-equal-strict
+    (L
+     &key (rule-classes '((:tau-system) (:forward-chaining)))
+     verbose
+     hints
+     otf-flg)
+  (declare (xargs :guard (proper-symbol-listp L)))
+  `(defdatas-equal ,L
+     :rule-classes ,rule-classes
+     :strictp t
+     :verbose ,verbose
+     :hints ,hints
+     :otf-flg ,otf-flg))
+
+; :trans1 (defdatas-equal (pos nat integer rational))
+; :trans1 (defdatas-equal-strict (pos nat integer rational))
 
 (logic)
 ; misc functions needed by other files in cgen

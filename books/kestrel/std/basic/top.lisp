@@ -1,4 +1,4 @@
-; Std/basic - Basic definitions
+; Standard Basic Library
 ;
 ; Copyright (C) 2019 Kestrel Institute (http://www.kestrel.edu)
 ;
@@ -10,6 +10,9 @@
 
 (in-package "ACL2")
 
+(include-book "organize-symbols-by-name")
+(include-book "organize-symbols-by-pkg")
+(include-book "symbol-name-lst")
 (include-book "symbol-package-name-lst")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -18,12 +21,12 @@
   :parents (std-extensions std/basic)
   :short
   (xdoc::topstring "Extensions of "
-                   (xdoc::seeurl "std/basic" "Std/basic")
+                   (xdoc::seetopic "std/basic" "Std/basic")
                    " in the "
-                   (xdoc::seeurl "kestrel-books" "Kestrel Books")
+                   (xdoc::seetopic "kestrel-books" "Kestrel Books")
                    ".")
   :long
   (xdoc::topstring
    (xdoc::p
-    "These extension could be moved under @('[books]/std/basic')
+    "These extensions could be moved under @('[books]/std/basic')
      at some point.")))

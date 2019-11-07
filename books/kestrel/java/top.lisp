@@ -40,7 +40,7 @@
    (xdoc::ul
     (xdoc::li
      "The "
-     (xdoc::a :href "https://docs.oracle.com/javase/specs/jls/se12/html"
+     (xdoc::a :href "https://docs.oracle.com/javase/specs/jls/se13/html"
        "Java language specification")
      ", referenced as `[JLS]' in the documentation of this library.
       Chapters and sections are referenced
@@ -49,7 +49,7 @@
       `[JLS:4.2]' references Section 4.2 of [JLS].")
     (xdoc::li
      "The "
-     (xdoc::a :href "https://docs.oracle.com/javase/specs/jvms/se12/html"
+     (xdoc::a :href "https://docs.oracle.com/javase/specs/jvms/se13/html"
        "Java Virtual Machine specification")
      ", referenced as `[JVMS]' in the documentation of this library.
       Chapters and sections are referenced
@@ -58,7 +58,7 @@
       `[JVMS:5.5]' references Section 5.5 of [JVMS].")
     (xdoc::li
      "The "
-     (xdoc::a :href "https://docs.oracle.com/en/java/javase/12/docs/api"
+     (xdoc::a :href "https://docs.oracle.com/en/java/javase/13/docs/api"
        "Java API specification")
      ", referenced as `[JAPIS]' in the documentation of this library."))
    (xdoc::p
@@ -131,7 +131,7 @@
       and other built-in ACL2 functions could be represented like that as well
       in the future.
       Each native function has its own unique Java class and instance:
-      its application to values is now handled via Java's dynamic dispath
+      its application to values is now handled via Java's dynamic dispatch
       rather than by cases analysis, thus optimizing evaluation.
       Each defined function has its own unique instance as well
       (so, all the ACL2 named functions are interned),
@@ -140,9 +140,37 @@
       look up the function definition in the environment,
       resulting in increased execution speed.")
     (xdoc::li
-     "The Java representation of the ACL2 environment
-      has been simplified to no longer include function definitions,
-      since they are now stored directly with the function themselves.")
+     "The Java class @('Acl2Environment') has been eliminated.
+      The information about the function definitions
+      is now stored directly with the function themselves.
+      The information about the package definitions
+      is now stored directly into instances of a Java class @('Acl2Package')
+      that has been added for this purpose;
+      this class also contains the information about the package witness name.")
+    (xdoc::li
+     "The package witness name,
+      i.e. the content of the @('*pkg-witness-name*') constant,
+      is now stored in a final static field,
+      which therefore no longer needs to be initialized
+      by code external to AIJ.
+      The consistency of this Java value with the actual ACL2 value
+      is checked via an assertion in a newly added file
+      @('[books]/kestrel/java/aij/assumptions.lisp').")
+    (xdoc::li
+     "The return types of some of the native Java implementation methods
+      of the ACL2 primitive functions in AIJ
+      have been made more precise than the general type @('Acl2Value'),
+      e.g. now the method for @(tsee equal) returns @('Acl2Symbol').")
+    (xdoc::li
+     "Public static methods have been added
+      to execute the native implementations of ACL2 functions
+      from outside AIJ.
+      This is in support of the shallow embedding approach (see below).")
+    (xdoc::li
+     "Some variant native implementations of ACL2 functions
+      have been added that assume the satisfaction of the guards.
+      This is in support of the shallow embedding approach (see below)
+      when assuming that the guards are satisfied (see below).")
     (xdoc::li
      "AIJ has been extended with the ability to validate statically that
       all the function calls have a number of arguments
@@ -159,4 +187,9 @@
     (xdoc::li
      "ATJ has been extended with a facility to generate Java code
       according to a shallow embedding approach,
-      in addition to the deep embedding approach described in the paper."))))
+      in addition to the deep embedding approach described in the paper.")
+    (xdoc::li
+     "ATJ has been extended with a facility to generate Java code
+      assuming that all the guards are satisfied.
+      This facility is available for
+      both the deep and shallow embedding approaches."))))

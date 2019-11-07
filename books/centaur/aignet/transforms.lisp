@@ -37,9 +37,7 @@
 (include-book "obs-constprop")
 (include-book "constprop")
 (include-book "abc-wrappers")
-
-;; for convenience, we provide a binding to the cube-sat transformation
-(include-book "cube-sat")
+(include-book "transform-stub")
 
 (defxdoc aignet-comb-transforms
   :parents (aignet)
@@ -433,12 +431,44 @@ for translating between ABC and aignet does not support xors.</p>"
 
 
 
-(define cube-sat-default-transform (aignet config state)
+(define aignet-comb-transform-default (aignet aignet2 config state)
+  :returns (mv new-aignet2 new-state)
+  (if (comb-transformlist-p config)
+      (time$ (apply-comb-transforms aignet aignet2 config state)
+             :msg "All transforms: ~st seconds, ~sa bytes.~%")
+    (prog2$ (er hard? 'aignet-comb-transform-default
+                "Config must satisfy ~x0, but did not: ~x1"
+                'comb-transformlist-p config)
+            (b* ((aignet2 (aignet-raw-copy aignet aignet2)))
+              (mv aignet2 state))))
+  ///
+  (defret num-ins-of-<fn>
+    (equal (stype-count :pi new-aignet2)
+           (stype-count :pi aignet)))
+
+  (defret num-regs-of-<fn>
+    (equal (stype-count :reg new-aignet2)
+           (stype-count :reg aignet)))
+
+  (defret num-outs-of-<fn>
+    (equal (stype-count :po new-aignet2)
+           (stype-count :po aignet)))
+
+  (defret <fn>-comb-equivalent
+    (comb-equiv new-aignet2 aignet))
+
+  (defret w-state-of-<fn>
+    (equal (w new-state)
+           (w state))))
+
+(defattach aignet-comb-transform-stub aignet-comb-transform-default)
+
+(define aignet-comb-transform!-default (aignet config state)
   :returns (mv new-aignet new-state)
   (if (comb-transformlist-p config)
-      (time$ (aignet::apply-comb-transforms! aignet::aignet config state)
+      (time$ (apply-comb-transforms! aignet config state)
              :msg "All transforms: ~st seconds, ~sa bytes.~%")
-    (prog2$ (er hard? 'cube-sat-default-transform
+    (prog2$ (er hard? 'aignet-comb-transform!-default
                 "Config must satisfy ~x0, but did not: ~x1"
                 'comb-transformlist-p config)
             (mv aignet state)))
@@ -462,4 +492,4 @@ for translating between ABC and aignet does not support xors.</p>"
     (equal (w new-state)
            (w state))))
 
-(defattach aignet-cube-sat-transform cube-sat-default-transform)
+(defattach aignet-comb-transform!-stub aignet-comb-transform!-default)

@@ -55,7 +55,10 @@
 #                 books, the jvm models, etc.  Usually, committers to
 #                 acl2-books should run "make pull-request" first.
 #
-#   all           A very full build, including very slow books.  Most users
+#   almost-everything
+#                 An alias for "all"
+#
+#   everything    A very full build, including very slow books.  Most users
 #                 will not want to use this target.  It is useful for, e.g.,
 #                 regression testing before releases.  Note that
 #                 EXCLUDED_PREFIXES may not work with the `all' target.
@@ -554,19 +557,21 @@ SLOW_BOOKS := \
   workshops/2009/sumners/support/examples.cert \
   workshops/2011/krug-et-al/support/MinVisor/va-to-pa-thm.cert \
   workshops/2011/krug-et-al/support/MinVisor/setup-nested-page-tables.cert \
-  workshops/2013/hardin-hardin/support/APSP.cert
+  workshops/2013/hardin-hardin/support/APSP.cert \
+  doc/top-slow.cert
+
 # The following could well be considered as slow books, too.
 # doc/top.cert
 # doc/top-fast.cert
 # projects/include-doc.cert
 # projects/doc.cert
 # projects/top-doc.cert
-# kestrel/auto-termination/defunt-tests.cert
 # ALSO, directory projects/async/gcd/ (perhaps even projects/async/)
 # AND   directory projects/arm/
 # could be added as x86isa is below.
 
-SLOW_BOOKS += $(filter projects/x86isa/%, $(OK_CERTS))
+ADDED_BOOKS += $(filter projects/x86isa/%, $(OK_CERTS))
+ADDED_BOOKS += $(filter projects/filesystems/%, $(OK_CERTS))
 
 SLOW_BOOK_TARGETS :=
 

@@ -17,22 +17,30 @@
 (defpkg "JAVA" (append *std-pkg-symbols*
                        '(*pkg-witness-name*
                          *primitive-formals-and-guards*
-                         access-event-tuple-namex
-                         access-event-tuple-type
+                         add-const-to-untranslate-preprocess
+                         add-suffix
                          all-ffn-symbs
-                         all-pkgs-in-world
+                         all-free/bound-vars
+                         all-vars-open
+                         all-vars-open-lst
                          alpha/digit-chars
                          alpha/digit/dash-charlist-p
                          alpha/digit/uscore/dollar-charlist-p
                          alpha/uscore/dollar-char-p
+                         arity+
                          bad-atom<=
                          body
                          bool
                          char-downcase
                          char-upcase
                          chars=>nats
+                         conjoin
+                         cons-pos-alistp
+                         define-sk
                          defxdoc+
                          doublets-to-alist
+                         dumb-occur-var-open
+                         dumb-occur-var-open-lst
                          ensure-boolean$
                          ensure-doublet-list$
                          ensure-function-name$
@@ -49,49 +57,101 @@
                          fargn
                          fargs
                          fcons-term
+                         fcons-term*
                          ffn-symb
+                         ffn-symb-p
                          flambda-applicationp
+                         flambdap
+                         flatten
                          fmt-hard-right-margin
                          fmt-soft-right-margin
                          formals
+                         formals+
                          fquotep
+                         function-namep
+                         function-name-listp
+                         implicate
                          implode
                          impossible
-                         known-packages
+                         index-of
+                         integers-from-to
+                         irecursivep
+                         known-packages+
                          lambda-body
                          lambda-formals
+                         logext
+                         loghead
                          logic-fns-with-raw-code
+                         logicp
                          lower-case-p
                          make-lambda
                          maybe-stringp
                          msg-listp
+                         nats=>string
                          no-stobjs-p
+                         organize-symbols-by-name
+                         organize-symbols-by-pkg
+                         packn
+                         packn-pos
                          partition-rest-and-keyword-args
+                         patbind-fun
+                         patbind-run-unless
                          patbind-run-when
                          primitivep
                          printable-charlist-p
                          program-fns-with-raw-code
+                         pseudo-lambdap
+                         pseudo-termfn-listp
                          pseudo-termfnp
+                         pure-raw-p
                          quote-listp
+                         rawp
+                         remove-assocs-eq
+                         remove-mbe-exec
+                         remove-mbe-logic
+                         remove-progn
+                         remove-trivial-vars
+                         remove-unused-vars
                          sbyte16
+                         sbyte16p
                          sbyte32
+                         sbyte32p
                          sbyte64
+                         sbyte64p
                          sbyte8
+                         sbyte8p
                          sort-symbol-listp
+                         str-fix
                          string-downcase
+                         string-string-alistp
+                         string-symbollist-alistp
                          string-upcase
+                         subcor-var
                          string=>nats
+                         symbol-name-lst
+                         symbol-pos-alistp
+                         symbol-string-alistp
+                         symbol-symbol-alistp
                          symbol-package-name-lst
+                         table-alist+
+                         tail-recursive-p
                          trans-eval
                          tuplep
                          typed-tuplep
+                         ubody
+                         ubody+
                          ubyte16
+                         ubyte16p
                          ubyte8=>hexchars
                          ubyte8s=>hexstring
+                         uguard
                          unnormalized-body
+                         unquote-term
+                         unquote-term-list
+                         unsigned-byte-listp
                          upper-case-p
                          variablep
+                         std::defret-mutual
+                         set::list-in
                          str::chars-in-charset-p
-                         str::natchars16
-                         str::natstr
-                         str::strtok)))
+                         str::natstr)))

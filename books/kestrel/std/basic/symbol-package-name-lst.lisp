@@ -1,4 +1,4 @@
-; Std/basic - Basic definitions
+; Standard Basic Library
 ;
 ; Copyright (C) 2019 Kestrel Institute (http://www.kestrel.edu)
 ;
@@ -25,4 +25,9 @@
     "This function is named similarly to the built-in @('symbol-name-lst')."))
   (cond ((endp syms) nil)
         (t (cons (symbol-package-name (car syms))
-                 (symbol-package-name-lst (cdr syms))))))
+                 (symbol-package-name-lst (cdr syms)))))
+  ///
+
+  (defret len-of-symbol-package-name-lst
+    (equal (len pkgs)
+           (len syms))))

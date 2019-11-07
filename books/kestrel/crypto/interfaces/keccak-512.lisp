@@ -19,7 +19,8 @@
   :input-size-limit nil
   :output-size 512
   :parents (interfaces)
-  :short "Keccak-512 interface."
+  :short (xdoc::topstring
+          "Keccak-512 " (xdoc::seetopic "interfaces" "interface") ".")
   :long
   (xdoc::topstring
    (xdoc::p
@@ -33,7 +34,12 @@
    (xdoc::p
     "According to the aforementioned specification,
      the output of Keccak-512 is a sequence of exactly 512 bits,
-     or 64 bytes.")))
+     or 64 bytes.")
+   (xdoc::p
+    "See also:"
+    (xdoc::ul
+     (xdoc::li (xdoc::seetopic "keccak::keccak" "Keccak-512 executable specification"))))
+   ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

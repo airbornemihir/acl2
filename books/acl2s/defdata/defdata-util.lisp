@@ -101,19 +101,18 @@
                               (stringp sep))))
   (b* (((unless (consp ss)) (er hard? 's+ "~| Expect at least one string/symbol arg, but given ~x0 ~%" ss))
        (s1 (car ss))
-       (pkg~ (or (and (stringp pkg) (not (equal pkg "")) pkg)
+       (pkg~ (or (and (pkgp pkg) pkg)
                  (and (symbolp s1) (symbol-package-name s1))
                  "DEFDATA"))
        ;; (- (cw "~| pkg to be used is : ~x0~%" pkg~))
        )
-  (intern$ (join-names ss sep) pkg~)))
+  (acl2s::fix-intern$ (join-names ss sep) pkg~)))
 
 (defun modify-symbol-lst (prefix syms postfix pkg)
   (declare (xargs :guard (and (symbol-listp syms)
                               (stringp prefix)
                               (stringp postfix)
-                              (not (equal pkg ""))
-                              (stringp pkg))))
+                              (pkgp pkg))))
   (if (endp syms)
     nil
     (cons (s+ prefix (car syms) postfix :pkg pkg)
@@ -151,16 +150,20 @@
                  (strip-cadrs (cdr x))))))
 
 (defconst *defthm-aliases*
-  '(acl2::defthm acl2::defthmd acl2::defthm+ acl2::defrule acl2::defaxiom))
+  '(acl2::defthm acl2::defthmd acl2::defthm+ acl2::defrule
+                 acl2::defaxiom acl2s::test-then-skip-proofs acl2::defcong
+                 acl2::defrefinement acl2::defequiv acl2::skip-proofs
+                 acl2s::defthm-no-test acl2s::defthm-test-no-proof))
 
 (defloop get-event-names (xs)
   "get names from defthm events"
   (declare (xargs :guard (acl2::all->=-len xs 2)))
-  (for ((x in xs)) (append (and (member-eq (car x) *defthm-aliases*) (list (cadr x))))))
+  (for ((x in xs)) (append (and (member-eq (car x) *defthm-aliases*)
+                                (list (cadr x))))))
 
 (defun keywordify (sym)
   (declare (xargs :guard (symbolp sym)))
-  (intern-in-package-of-symbol (symbol-name sym) :a))
+  (acl2s::fix-intern-in-pkg-of-sym (symbol-name sym) :a))
 
 ; utility fn to print if verbose flag is true
 (defmacro cw? (verbose-flag &rest rst)
@@ -183,11 +186,14 @@
 
 (verify-termination acl2::LEGAL-VARIABLE-OR-CONSTANT-NAMEP)
 (verify-termination acl2::legal-constantp)
+(verify-termination acl2::legal-variablep)
 ;;-- convert function lambda-keywordp from :program mode to :logic mode
 (verify-termination acl2::lambda-keywordp)
 (verify-guards  acl2::lambda-keywordp)
 (verify-guards acl2::legal-constantp)
 
+; We do not use legal-variablep because we want to register
+; constructors such as /, which is not a legal-variablep.
 (defun proper-symbolp (x)
   (declare (xargs :guard t))
   (and (symbolp x)
@@ -268,13 +274,40 @@
 ;;                 (symbolp x))
 ;;            (alistp (table-alist x w))))
 
+(defun sym-aalistp (x)
+  (declare (xargs :guard t))
+  (if (consp x)
+      (and (consp (car x))
+           (symbolp (caar x))
+           (symbol-alistp (cdar x))
+           (sym-aalistp (cdr x)))
+    (null x)))
+
+(defun base-alias-type (type A)
+  (declare (xargs :guard (sym-aalistp A)))
+  (b* (((unless (symbolp type)) type)
+       (atype (assoc-equal :type (acl2s::get-alist type A))))
+    (if (consp atype)
+        (cdr atype)
+      type)))
+
+(defun base-alias-pred (pred ptbl)
+  (declare (xargs :guard (sym-aalistp ptbl)))
+  (b* (((unless (symbolp pred)) pred)
+       (ppred (assoc-equal :predicate (acl2s::get-alist pred ptbl))))
+    (if (consp ppred)
+        (cdr ppred)
+      pred)))
+
 (defun is-allp-alias (P wrld)
   "is predicate P an alias of allp?"
   ;; (declare (xargs :guard (and (proper-symbolp P)
   ;;                             (plist-worldp wrld))))
   (declare (xargs :verify-guards nil))
-  (or (eq P 'ACL2S::ALLP)
-      (assoc P (table-alist 'ACL2S::ALLP-ALIASES wrld))))
+  (b* ((ptbl (table-alist 'pred-alias-table wrld))
+       (P (base-alias-pred P ptbl)))
+    (or (eq P 'acl2s::allp)
+        (assoc P (table-alist 'defdata::allp-aliases-table wrld)))))
 
 ; TODO -- use this in places where we check for Top type.
 (defun is-top (typename wrld)
@@ -282,8 +315,10 @@
   ;; (declare (xargs :guard (and (proper-symbolp P)
   ;;                             (plist-worldp wrld))))
   (declare (xargs :verify-guards nil))
-  (or (eq typename 'ACL2S::ALL)
-      (rassoc typename (table-alist 'ACL2S::ALLP-ALIASES wrld))))
+  (b* ((atbl (table-alist 'type-alias-table wrld))
+       (typename (base-alias-type typename atbl)))
+    (or (eq typename 'acl2s::all)
+        (rassoc typename (table-alist 'defdata::allp-aliases-table wrld)))))
 
 ; CHECK with J. TODO What if there is some information in pos-implicants of P1,
 ; that is missed below!?
@@ -352,21 +387,19 @@
          (< 1 len-predname) ;atleast have "p" and one more char
          (equal #\P (acl2::char pred-name (1- len-predname)))) ;WTF, smallcase p wouldnt work
       (let ((typename (acl2::subseq pred-name 0 (1- len-predname))));strip last char which is 'p'
-        (intern-in-package-of-symbol typename sym))
+        (acl2s::fix-intern-in-pkg-of-sym typename sym))
       NIL))) ;TODO.Beware
       ;(er hard 'get-typesymbol-from-pred "~x0 doesnt follow our convention of predicates ending with 'p'.~%" sym))))
 
 ;;-- (make-predicate-symbol 'integer "ACL2S B") ==> ACL2S B::INTEGERP
 (defun make-predicate-symbol (sym pkg)
   (declare (xargs :guard (and (symbolp sym)
-                              (not (equal pkg ""))
-                              (stringp pkg))))
+                              (pkgp pkg))))
   (s+ sym "P" :pkg pkg))
 
 (defun make-predicate-symbol-lst (syms pkg)
   (declare (xargs :guard (and (symbol-listp syms)
-                              (not (equal pkg ""))
-                              (stringp pkg))))
+                              (pkgp pkg))))
   (if (endp syms)
     nil
     (cons (make-predicate-symbol (car syms) pkg)
@@ -375,14 +408,12 @@
 
 (defun make-enumerator-symbol (sym pkg)
   (declare (xargs :guard (and (symbolp sym)
-                              (not (equal pkg ""))
-                              (stringp pkg))))
+                              (pkgp pkg))))
   (s+ "NTH-" sym :pkg pkg))
 
 (defun make-uniform-enumerator-symbol (sym pkg)
-    (declare (xargs :guard (and (symbolp sym)
-                                (not (equal pkg ""))
-                                (stringp pkg))))
+  (declare (xargs :guard (and (symbolp sym)
+                              (pkgp pkg))))
   (s+ "NTH-" sym "/ACC" :pkg pkg))
 
 ;;--check arity of macro optional arguments
@@ -605,15 +636,6 @@
                               (natp k))))
   (reverse (symbol-fns::item-to-numbered-symbol-list-rec x k)))
 
-(defun sym-aalistp (x)
-  (declare (xargs :guard t))
-  (if (consp x)
-      (and (consp (car x))
-           (symbolp (caar x))
-           (symbol-alistp (cdar x))
-           (sym-aalistp (cdr x)))
-    (null x)))
-
 #|
 This is true when we have defdata available.
 
@@ -621,47 +643,102 @@ This is true when we have defdata available.
 (thm (equal (sym-aalistp x) (symbol-aalistp x)))
 |#
 
-(defun base-alias-type (type A)
-  (declare (xargs :guard (and (symbolp type) (sym-aalistp A))))
-  (b* ((atype (assoc-equal :type (acl2s::get-alist type A))))
-    (if (consp atype)
-        (cdr atype)
-      type)))
+#|
+(i-am-here) :add enumerator macros for the alias, eg, nth-nn-rat/acc
+nth-nn-rat
+see (defdata foo rational)
 
-(defun base-alias-pred (pred ptbl)
-  (declare (xargs :guard (and (symbolp pred) (sym-aalistp ptbl))))
-  (b* ((ppred (assoc-equal :predicate (acl2s::get-alist pred ptbl))))
-    (if (consp ppred)
-        (cdr ppred)
-      pred)))
+|#
 
-(defmacro defdata-alias (alias type &optional pred)
-  `(make-event
-    (b* ((pkg (current-package state))
-         (M (type-metadata-table (w state)))
-         (A (type-alias-table (w state)))
-         (pred (if ',pred ',pred (make-predicate-symbol ',alias pkg)))
-         (type (base-alias-type ',type A))
-         (predicate (acl2s::get-alist :predicate (acl2s::get-alist type M)))
-         (x (intern$ "X" pkg))
-         ((unless predicate)
-          (er hard 'defdata-alias
- "~%**Unknown type**: ~x0 is not a known type name.~%" ',type )))
-      `(encapsulate
-        ()
-        (table type-alias-table
-               ',',alias
-               '((:pred . ,pred)
-                 (:type . ,type)
-                 (:predicate . ,predicate))
-               :put)
-        (table pred-alias-table
-               ',pred
-               '((:alias . ,',alias)
-                 (:type . ,type)
-                 (:predicate . ,predicate))
-               :put)
-        (defmacro ,pred (,x) `(,',predicate ,,x))))))
+(defmacro defdata-alias (alias type &rest args)
+  (b* ((verbosep (let ((lst (member :verbose args)))
+                   (and lst (cadr lst))))
+       (pred (let ((lst (member :pred args)))
+               (and lst (cadr lst))))
+       (- (cw "~%")))
+    `(with-output
+      ,@(and (not verbosep) '(:off :all :on (summary error) :summary (acl2::form acl2::time)))
+      :gag-mode t :stack :push
+      (make-event
+       (b* ((pkg (current-package state))
+            (M (type-metadata-table (w state)))
+            (A (type-alias-table (w state)))
+            (pred (if ',pred ',pred (make-predicate-symbol ',alias pkg)))
+            (type (base-alias-type ',type A))
+            (predicate (acl2s::get-alist
+                        :predicate (acl2s::get-alist type M)))
+            (base-enum (enumerator-name type A M))
+            (base-enum/acc (enum/acc-name type A M))
+            (alias-enum (acl2s::make-symbl `(nth- ,',alias) pkg))
+            (alias-enum-acc (acl2s::make-symbl `(,alias-enum /acc) pkg))
+            (x (acl2s::fix-intern$ "X" pkg))
+            (seed (acl2s::fix-intern$ "SEED" pkg))
+            ((unless predicate)
+             (er hard 'defdata-alias
+                 "~%**Unknown type**: ~x0 is not a known type name.~%" ',type)))
+         `(encapsulate
+           ()
+           (table type-alias-table
+                  ',',alias
+                  '((:pred . ,pred)
+                    (:type . ,type)
+                    (:predicate . ,predicate))
+                  :put)
+           (table pred-alias-table
+                  ',pred
+                  '((:alias . ,',alias)
+                    (:type . ,type)
+                    (:predicate . ,predicate))
+                  :put)
+           (defmacro ,pred (,x) `(,',predicate ,,x))
+           (defmacro ,alias-enum (,x) `(,',base-enum ,,x))
+           (defmacro ,alias-enum-acc (,x ,seed) `(,',base-enum/acc ,,x ,,seed))))))))
+
+#|
+(defmacro defdata-alias (alias type &rest args)
+  (b* ((verbosep (let ((lst (member :verbose args)))
+                   (and lst (cadr lst))))
+       (pred (let ((lst (member :pred args)))
+               (and lst (cadr lst))))
+       (- (cw "~%")))
+    `(make-event
+      (b* ((pkg (current-package state))
+           (M (type-metadata-table (w state)))
+           (A (type-alias-table (w state)))
+           (pred (if ',pred ',pred (make-predicate-symbol ',alias pkg)))
+           (type (base-alias-type ',type A))
+           (predicate (acl2s::get-alist
+                       :predicate (acl2s::get-alist type M)))
+           (base-enum (enumerator-name type A M))
+           (base-enum/acc (enum/acc-name type A M))
+           (alias-enum (acl2s::make-symbl `(nth- ,',alias) pkg))
+           (alias-enum-acc (acl2s::make-symbl `(,alias-enum /acc) pkg))
+           (x (acl2s::fix-intern$ "X" pkg))
+           (seed (acl2s::fix-intern$ "SEED" pkg))
+           ((unless predicate)
+            (er hard 'defdata-alias
+                "~%**Unknown type**: ~x0 is not a known type name.~%" ',type )))
+        `(with-output
+          ,@(and (not ,verbosep) '(:off :all :on (summary error) :summary (acl2::form acl2::time)))
+          :gag-mode t :stack :push
+          (encapsulate
+           ()
+           (table type-alias-table
+                  ',',alias
+                  '((:pred . ,pred)
+                    (:type . ,type)
+                    (:predicate . ,predicate))
+                  :put)
+           (table pred-alias-table
+                  ',pred
+                  '((:alias . ,',alias)
+                    (:type . ,type)
+                    (:predicate . ,predicate))
+                  :put)
+           (defmacro ,pred (,x) `(,',predicate ,,x))
+           (defmacro ,alias-enum (,x) `(,',base-enum ,,x))
+           (defmacro ,alias-enum-acc (,x ,seed) `(,',base-enum/acc ,,x ,,seed))))))))
+|#
 
 (defmacro predicate-name (tname &optional A M)
 ; if Metadata table is not provided, wrld should be in scope.
@@ -883,21 +960,24 @@ This is true when we have defdata available.
 
 ;copied from std/util/support
 (defun extract-keywords
-    (ctx        ; context for error messages
-     legal-kwds ; what keywords the args are allowed to contain
-     args       ; args that the user supplied
-     kwd-alist  ; accumulator alist of extracted keywords to values
+    (ctx         ; context for error messages
+     legal-kwds  ; what keywords the args are allowed to contain
+     args        ; args that the user supplied
+     kwd-alist   ; accumulator alist of extracted keywords to values
+     ok-dup-kwds ; keywords that can have duplicates
      )
   "Returns (mv kwd-alist other-args)"
   (declare (xargs :guard (and (symbol-listp legal-kwds)
                               (no-duplicatesp legal-kwds)
-                              (alistp kwd-alist))))
+                              (alistp kwd-alist)
+                              (symbol-listp ok-dup-kwds))))
   (b* (((when (atom args))
-        (mv kwd-alist args))
+        (mv (revappend kwd-alist nil) args))
        (arg1 (first args))
        ((unless (keywordp arg1))
         (b* (((mv kwd-alist other-args)
-              (extract-keywords ctx legal-kwds (cdr args) kwd-alist)))
+              (extract-keywords
+               ctx legal-kwds (cdr args) kwd-alist ok-dup-kwds)))
           (mv kwd-alist (cons arg1 other-args))))
        ((unless (member arg1 legal-kwds))
         (er hard? ctx (concatenate 'string
@@ -910,12 +990,13 @@ This is true when we have defdata available.
        ((when (atom (rest args)))
         (er hard? ctx "~x0: keyword ~x1 has no argument." ctx arg1)
         (mv nil nil))
-       ((when (assoc arg1 kwd-alist))
+       ((when (and (not (member-equal arg1 ok-dup-kwds))
+                   (assoc arg1 kwd-alist)))
         (er hard? ctx "~x0: multiple occurrences of keyword ~x1." ctx arg1)
         (mv nil nil))
        (value (second args))
        (kwd-alist (acons arg1 value kwd-alist)))
-    (extract-keywords ctx legal-kwds (cddr args) kwd-alist)))
+    (extract-keywords ctx legal-kwds (cddr args) kwd-alist ok-dup-kwds)))
 
 ;; (defstub is-disjoint (* * *) => *)
 ;; (defstub is-subtype (* * *) => *)
@@ -975,12 +1056,18 @@ This is true when we have defdata available.
         (or (cadr (assoc-keyword :guard (cdar edecls))) 't)
       (extract-guard-from-edecls (cdr edecls)))))
 
+#|
+
+PETE: seems like this is not used. If used, have to 
+fix s+ form so that it has access to pkg.
+
 (defmacro acl2s::defun-attach (&rest args)
   "generate a defun with suffix -builtin and attach it to name"
   (b* ((name (car args))
        ((unless (proper-symbolp name))
         (er hard 'defun-attach "~| ~x0 should be a proper name symbol.~%" name))
-       (b-name (s+ name "-BUILTIN"))
+       (pkg (extract-kwd-val :pkg args))
+       (b-name (s+ name "-BUILTIN" :pkg pkg))
        (formals (cadr args))
        ;(formal-stars (make-list (len formals) :initial-element 'ACL2::*))
        (guard (extract-guard-from-edecls (collect-declares args))))
@@ -994,6 +1081,8 @@ This is true when we have defdata available.
                 (declare (ignorable . ,formals))
                 (,b-name . ,formals))))
       (DEFATTACH ,name ,b-name))))
+
+|#
 
 (defun convert-listpairs-to-conspairs (listpairs)
   (declare (xargs :guard (acl2::symbol-doublet-listp listpairs)))

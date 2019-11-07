@@ -246,7 +246,8 @@
   :hints(("Goal" :in-theory (enable numlist-to-vars scdr s-endp
                                     slice-to-bdd-env
                                     nat-listp)
-          :induct (numlist-to-vars lst))))
+          :induct (numlist-to-vars lst)
+          :expand ((:free (a b env) (bfr-list->s (cons a b) env))))))
 
 ;; (defthm bfr-list->u-numlist-subset-append
 ;;   (implies (and (nat-listp lst)
@@ -349,7 +350,7 @@
          :hints(("Goal" :in-theory (e/d (acl2::list-equiv)
                                         (bfr-list->s-of-list-fix))
                  :use ((:instance bfr-list->s-of-list-fix)
-                       (:instance bfr-list->s-of-list-fix (x acl2::x-equiv)))))))
+                       (:instance bfr-list->s-of-list-fix (x x-equiv)))))))
 
 (defthm bfr-list->s-of-append
   (implies (consp b)
@@ -839,7 +840,8 @@
                    (bfr-list->s (numlist-to-vars lst) env)))
    :hints(("Goal" :in-theory (enable numlist-to-vars bfr-list->s
                                      scdr s-endp
-                                     nat-listp member-equal)))))
+                                     nat-listp member-equal)
+          :expand ((:free (a b env) (bfr-list->s (cons a b) env)))))))
 
 
 
@@ -899,7 +901,8 @@
                                        integer-env-slice
                                        logbitp
                                        logcons)
-             :induct (integer-env-slice lst n))))
+             :induct (integer-env-slice lst n)
+             :expand ((:free (a b env) (bfr-list->s (cons a b) env))))))
 
    ;; (defthm eval-slice-bfr-list->s-natural-env-slice
    ;;   (implies (and (mv-nth 0 (natural-env-slice lst n))

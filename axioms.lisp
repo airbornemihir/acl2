@@ -1042,11 +1042,13 @@
 #-acl2-loop-only
 (progn
 
-(defvar *user-stobj-alist* nil)
+(defvar *user-stobj-alist*
 
-; The value of the above variable is an alist that pairs user-defined
-; single-threaded object names with their live ones.  It does NOT
-; contain an entry for STATE, which is not user-defined.
+; The value of this variable is an alist that pairs user-defined
+; single-threaded object names with their live ones.  It does NOT contain an
+; entry for STATE, which is not user-defined.
+
+  nil)
 
 ; The following SPECIAL VARIABLE, *wormholep*, when non-nil, means that we
 ; are within a wormhole and are obliged to undo every change visited upon
@@ -3668,6 +3670,20 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
 
 (defconst *inline-suffix* "$INLINE") ; also see above defun-inline-form
 
+#-(or acl2-loop-only gcl)
+(declaim
+
+; This declaim form avoids warnings that would otherwise be generated during
+; the boot-strap (in CCL, at least) by ec-call.  We don't bother in GCL because
+; the declaim form itself has caused a warning!
+
+ (ftype function
+        acl2_*1*_acl2::apply$
+        acl2_*1*_acl2::rewrite-rule-term-exec
+        acl2_*1*_acl2::conjoin
+        acl2_*1*_acl2::pairlis$
+        acl2_*1*_acl2::close-input-channel))
+
 #-acl2-loop-only
 (defmacro ec-call1-raw (ign x)
   (declare (ignore ign))
@@ -3689,38 +3705,26 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
       `(cond
         (*safe-mode-verified-p* ; see below for discussion of this case
          ,x)
-        (t
+
+; Through Version_8.2 we had a single funcall below, where the first argument
+; depended on whether (fboundp ',*1*fn) or else (fboundp ',*1*fn$inline).  But
+; SBCL took a very long to compile the function apply$-prim in
+; books/projects/apply-model-2/apply-prim.lisp (and perhaps other such
+; apply$-prim definitions), which we fixed by lifting those fboundp tests above
+; the calls of funcall.  This reduced the time (presumably virtually all of it
+; for compilation) from 1294.33 seconds to 8.12 seconds.
+
+        ((fboundp ',*1*fn)
+         (funcall ',*1*fn ,@(cdr x)))
+        ((fboundp ',*1*fn$inline)
          (funcall
-          (cond
-           ((fboundp ',*1*fn) ',*1*fn)
-           ((fboundp ',*1*fn$inline)
-            (assert$ (macro-function ',(car x)) ; sanity check; could be omitted
-                     ',*1*fn$inline))
-           (t
-
-; We should never hit this case, unless the user is employing trust tags or raw
-; Lisp.  For ACL2 events that might hit this case, such as a defconst using
-; ec-call in a book (see below), we should ensure that *safe-mode-verified-p*
-; is bound to t.  For example, we do so in the raw Lisp definition of defconst,
-; which is justified because when ACL2 processes the defconst it will evaluate
-; in safe-mode to ensure that no raw Lisp error could occur.
-
-; Why is the use above of *safe-mode-verified-p* necessary?  If an event in a
-; book calls ec-call in raw Lisp, then we believe that the event is a defpkg or
-; defconst event.  In such cases, ec-call may be expected to invoke a *1*
-; function.  Unfortunately, the *1* function definitions are laid down (by
-; write-expansion-file) at the end of the expansion file.  However, we cannot
-; simply move the *1* definitions to the front of the expansion file, because
-; some may refer to constants or packages defined in the book.  We might wish
-; to consider interleaving *1* definitions with events from the book but that
-; seems difficult to do.  Instead, we arrange with *safe-mode-verified-p* to
-; avoid the *1* function calls entirely when loading the expansion file (or its
-; compilation).
-
-            (error "Undefined function, ~s.  Please contact the ACL2 ~
-                  implementors."
-                   ',*1*fn)))
-          ,@(cdr x))))))))
+          (assert$ (macro-function ',(car x)) ; sanity check; could be omitted
+                   ',*1*fn$inline)
+          ,@(cdr x)))
+        (t
+         (error "Undefined function, ~s.  Please contact the ACL2 ~
+                 implementors."
+                ',*1*fn)))))))
 
 (defmacro ec-call1 (ign x)
 
@@ -6200,7 +6204,7 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
                              (cons #\1 :gag-mode))))))
          ((eq (car args) :evisc) ; we leave it to without-evisc to check syntax
           (with-output-fn ctx (cddr args) off on gag-mode off-on-p gag-p
-                            stack summary summary-p (cadr args) t))
+                          stack summary summary-p (cadr args) t))
          ((eq (car args) :stack)
           (cond
            (stack
@@ -6298,13 +6302,15 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
     (let ((form
            `(state-global-let*
              (,@
-              (and gag-p
+              (and (or gag-p
+                       (eq stack :pop))
                    `((gag-mode (f-get-global 'gag-mode state)
                                set-gag-mode-fn)))
               ,@
               (and (or off-on-p
                        (eq stack :pop))
-                   '((inhibit-output-lst (f-get-global 'inhibit-output-lst state))))
+                   '((inhibit-output-lst (f-get-global 'inhibit-output-lst
+                                                       state))))
               ,@
               (and stack
                    '((inhibit-output-lst-stack
@@ -6317,13 +6323,13 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
                          (list 'quote
                                (set-difference-eq *summary-types* summary)))))))
              (er-progn
-              ,@(and gag-p
-                     `((pprogn (set-gag-mode ,gag-mode)
-                               (value nil))))
               ,@(and stack
                      `((pprogn ,(if (eq stack :pop)
                                     '(pop-inhibit-output-lst-stack state)
                                   '(push-inhibit-output-lst-stack state))
+                               (value nil))))
+              ,@(and gag-p
+                     `((pprogn (set-gag-mode ,gag-mode)
                                (value nil))))
               ,@(and off-on-p
                      `((set-inhibit-output-lst
@@ -12658,6 +12664,20 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
   #-acl2-loop-only
   (set-acl2-array-property name nil))
 
+(defun maybe-flush-and-compress1 (name ar)
+  (declare (xargs :guard (array1p name ar)))
+  #+acl2-loop-only
+  (compress1 name ar)
+  #-acl2-loop-only
+  (let ((old (get-acl2-array-property name)))
+    (cond
+     ((null old)
+      (compress1 name ar))
+     ((eq (car old) ar)
+      ar)
+     (t (prog2$ (flush-compress name)
+                (compress1 name ar))))))
+
 ; MULTIPLE VALUE returns, done our way, not Common Lisp's way.
 
 ; We implement an efficient mechanism for returning a multiple value,
@@ -13037,6 +13057,37 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
 (defmacro mv-list (input-arity x)
   `(cons ,x (mv-refs (1- ,input-arity))))
 
+(defmacro swap-stobjs (x y)
+
+; The call (swap-stobjs st1 st2) logically swaps two input stobjs st1 and st2,
+; but with the same stobjs-out as (mv st1 st2).  See translate11
+
+; Note that since there are no duplicate live stobjs, it should be fine to call
+; this macro even if one or both inputs are locally-bound (by with-local-stobj
+; or stobj-let).  Ultimately, the user-stobj-alist is put right by the calls of
+; latch-stobjs in raw-ev-fncall.
+
+; Trans-eval does not itself manage the user-stobj-alist, so we disallow the
+; use of swap-stobjs at the top level; see translate11 and macroexpand1*-cmp.
+; Before implementing that restriction, the following example illustrated that
+; the user-stobj-alist wasn't being suitably updated by top-level calls.
+
+;   (defstobj st1 fld1)
+;   (defstobj st2 fld2 :congruent-to st1)
+;   (defun foo (st1 st2)
+;     (declare (xargs :stobjs (st1 st2)))
+;     (swap-stobjs st1 st2))
+;   (update-fld1 3 st1)
+;   (update-fld1 4 st2)
+;   (swap-stobjs st1 st2)
+;   (fld1 st1) ; ERROR: 3, but should be 4
+;   (fld1 st2) ; ERROR: 4, but should be 3
+;   (foo st1 st2)
+;   (fld1 st1) ; 4, now as expected
+;   (fld1 st2) ; 3, now as expected
+
+  `(mv ,y ,x))
+
 (defun update-nth (key val l)
   (declare (xargs :guard (true-listp l))
            (type (integer 0 *) key))
@@ -13365,7 +13416,6 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
     recompress-global-enabled-structure ; get-acl2-array-property
     ev-w ; *the-live-state*
     verbose-pstack ; *verbose-pstk*
-    user-stobj-alist-safe ; chk-user-stobj-alist
     comp-fn ; compile-uncompiled-defuns
     #+acl2-infix fmt-ppr
     acl2-raw-eval ; eval
@@ -13450,6 +13500,7 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
     check-sum-obj
     verify-guards-fn1 ; to update *cl-cache*
     ev-fncall+-w
+    extend-current-theory
     ))
 
 (defconst *initial-logic-fns-with-raw-code*
@@ -13499,6 +13550,7 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
     hard-error ; *HARD-ERROR-RETURNS-NILP*, FUNCALL, ...
     abort! p! ; THROW
     flush-compress ; SETF [may be critical for correctness]
+    maybe-flush-and-compress1
     alphorder ; [bad atoms]
     extend-world ; EXTEND-WORLD1
     default-total-parallelism-work-limit ; for #+acl2-par (raw Lisp error)
@@ -20995,7 +21047,6 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
     coerce-object-to-state
     create-state
     user-stobj-alist
-    user-stobj-alist-safe
 
     f-put-ld-specials
 
@@ -22515,10 +22566,10 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
 ; the rewrite nest, while at the same time turning off the rewrite-stack depth
 ; limit check.
 
-; When we do a make certify-books or make regression after compiling with
-; acl2-rewrite-meter in *features*, we will create a file foo.rstats for every
-; book foo being certified.  We can then collect all those stats into a single
-; file by executing the following Unix command, where DIR is the acl2-sources
+; When we do a regression after compiling with acl2-rewrite-meter in
+; *features*, we will create a file foo.rstats for every book foo being
+; certified.  We can then collect all those stats into a single file by
+; executing the following Unix command, where DIR is the acl2-sources
 ; directory:
 
 ; find DIR/books -name '*.rstats' -exec cat {} \; > rewrite-depth-stats.lisp
@@ -27793,7 +27844,13 @@ Lisp definition."
   (declare (ignore always))
   #-acl2-loop-only
   (let ((temp (svref *inside-absstobj-update* 0)))
-    (cond ((or (null temp)
+    (cond ((or (and (eq val :ignore)
+                    (or (ttag (w *the-live-state*))
+                        (er hard 'set-absstobj-debug
+                            "It is illegal to supply the value :ignore to ~
+                             set-absstobj-debug unless there is an active ~
+                             trust tag.")))
+               (null temp)
                (eql temp 0)
                (and always
                     (or (ttag (w *the-live-state*))
@@ -27804,14 +27861,17 @@ Lisp definition."
            (setf (aref *inside-absstobj-update* 0)
                  (cond ((eq val :reset)
                         (if (natp temp) 0 nil))
+                       ((eq val :ignore)
+                        :ignore)
                        (val nil)
                        (t 0))))
           (t (er hard 'set-absstobj-debug
-                 "It is illegal to call set-absstobj-debug in a context where ~
-                  an abstract stobj invariance violation has already occurred ~
-                  but not yet been processed.  You can overcome this ~
-                  restriction either by waiting for the top-level prompt, or ~
-                  by evaluating the following form: ~x0."
+                 "It is illegal to call set-absstobj-debug with value other ~
+                  than :ignore in a context where an abstract stobj ~
+                  invariance violation has already occurred but not yet been ~
+                  processed.  You can overcome this restriction either by ~
+                  waiting for the top-level prompt, or by evaluating the ~
+                  following form: ~x0."
                  `(set-abbstobj-debug ,(if (member-eq val '(nil :reset))
                                            nil
                                          t)
@@ -28622,3 +28682,25 @@ Lisp definition."
 
 (defmacro print-cl-cache (&optional i j)
   `(print-cl-cache-fn ,i ,j))
+
+; We include definitions here of count-keys (from Sol Swords) and thus also
+; hons-remove-assoc (from community book
+; books/std/alists/hons-remove-assoc.lisp) in support of hash-table fields of
+; stobjs.
+
+(defun hons-remove-assoc (k x)
+  (declare (xargs :guard t))
+  (if (atom x)
+      nil
+    (if (and (consp (car x))
+             (not (equal k (caar x))))
+        (cons (car x) (hons-remove-assoc k (cdr x)))
+      (hons-remove-assoc k (cdr x)))))
+
+(defun count-keys (al)
+  (declare (xargs :guard t))
+  (if (atom al)
+      0
+    (if (consp (car al))
+        (+ 1 (count-keys (hons-remove-assoc (caar al) (cdr al))))
+      (count-keys (cdr al)))))

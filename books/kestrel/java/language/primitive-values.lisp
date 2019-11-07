@@ -10,35 +10,41 @@
 
 (in-package "JAVA")
 
-(include-book "kestrel/fty/defbyte-standard-instances" :dir :system)
+(include-book "kestrel/fty/ubyte16" :dir :system)
+(include-book "kestrel/fty/sbyte8" :dir :system)
+(include-book "kestrel/fty/sbyte16" :dir :system)
+(include-book "kestrel/fty/sbyte32" :dir :system)
+(include-book "kestrel/fty/sbyte64" :dir :system)
+(include-book "kestrel/std/util/deffixer" :dir :system)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defxdoc+ primitive-values
-  :parents (language)
+  :parents (semantics)
   :short "Java primitive values [JLS:4.2]."
   :long
   (xdoc::topstring
    (xdoc::p
     "We formalize the Java boolean and integral values.
-     We also provide an abstract notion of the Java floating-point values,
+     We also provide abstract notions of the Java floating-point values,
      as a placeholder for a more precise formalization of them.")
    (xdoc::p
     "Our formalization tags the Java primitive values
      with an indication of their types
      (and, for floating-point values, of their value sets),
-     making values of different types (and floating-point value sets) disjoint.
+     making values of different types (and of floating-point value sets)
+     disjoint.
      This will allow us
      to define a defensive semantics of Java
      and to prove that the static checks at compile time
      guarantee type safety at run time,
      as often done in programming language formalizations."))
-  :order-subtopics t)
+  :order-subtopics t
+  :default-parent t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (fty::defprod boolean-value
-  :parents (primitive-values)
   :short "Java @('boolean') values [JLS:4.2.5]."
   ((bool bool))
   :tag :boolean
@@ -54,52 +60,114 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (fty::defprod char-value
-  :parents (primitive-values)
   :short "Java @('char') values [JLS:4.2.1]."
   ((nat ubyte16))
   :tag :char
-  :layout :list)
+  :layout :list
+  ///
+
+  (defrule char-value->nat-upper-bound
+    (<= (char-value->nat x) 65535)
+    :rule-classes :linear
+    :enable (char-value->nat
+             acl2::ubyte16p
+             acl2::ubyte16-fix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (fty::defprod byte-value
-  :parents (primitive-values)
   :short "Java @('byte') values [JLS:4.2.1]."
   ((int sbyte8))
   :tag :byte
-  :layout :list)
+  :layout :list
+  ///
+
+  (defrule byte-value->int-lower-bound
+    (<= -128 (byte-value->int x))
+    :rule-classes :linear
+    :enable (byte-value->int
+             acl2::sbyte8p
+             acl2::sbyte8-fix))
+
+  (defrule byte-value->int-upper-bound
+    (<= (byte-value->int x) 127)
+    :rule-classes :linear
+    :enable (byte-value->int
+             acl2::sbyte8p
+             acl2::sbyte8-fix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (fty::defprod short-value
-  :parents (primitive-values)
   :short "Java @('short') values [JLS:4.2.1]."
   ((int sbyte16))
   :tag :short
-  :layout :list)
+  :layout :list
+  ///
+
+  (defrule short-value->int-lower-bound
+    (<= -32768 (short-value->int x))
+    :rule-classes :linear
+    :enable (short-value->int
+             acl2::sbyte16p
+             acl2::sbyte16-fix))
+
+  (defrule short-value->int-upper-bound
+    (<= (short-value->int x) 32767)
+    :rule-classes :linear
+    :enable (short-value->int
+             acl2::sbyte16p
+             acl2::sbyte16-fix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (fty::defprod int-value
-  :parents (primitive-values)
   :short "Java @('int') values [JLS:4.2.1]."
   ((int sbyte32))
   :tag :int
-  :layout :list)
+  :layout :list
+  ///
+
+  (defrule int-value->int-lower-bound
+    (<= -2147483648 (int-value->int x))
+     :rule-classes :linear
+    :enable (int-value->int
+             acl2::sbyte32p
+             acl2::sbyte32-fix))
+
+  (defrule int-value->int-upper-bound
+    (<= (int-value->int x) 2147483647)
+    :rule-classes :linear
+    :enable (int-value->int
+             acl2::sbyte32p
+             acl2::sbyte32-fix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (fty::defprod long-value
-  :parents (primitive-values)
   :short "Java @('long') values [JLS:4.2.1]."
   ((int sbyte64))
   :tag :long
-  :layout :list)
+  :layout :list
+  ///
+
+  (defrule long-value->int-lower-bound
+    (<= -9223372036854775808 (long-value->int x))
+     :rule-classes :linear
+    :enable (long-value->int
+             acl2::sbyte64p
+             acl2::sbyte64-fix))
+
+  (defrule long-value->int-upper-bound
+    (<= (long-value->int x) 9223372036854775807)
+    :rule-classes :linear
+    :enable (long-value->int
+             acl2::sbyte64p
+             acl2::sbyte64-fix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defsection float-value
-  :parents (primitive-values)
   :short "Java @('float') values in the float value set [JLS:4.2.3]."
   :long
   (xdoc::topstring
@@ -128,34 +196,31 @@
 
   (define float-value-p (x)
     :returns (yes/no booleanp)
+    :parents (float-value)
+    :short "Recognizer for @(tsee float-value)."
     (and (tuplep 2 x)
          (eq (first x) :float)
-         (float-value-p-aux (second x))))
-
-  (define float-value-fix ((x float-value-p))
-    :returns (fixed-x float-value-p
-                      :hints (("Goal" :in-theory (enable float-value-p))))
-    (mbe :logic (if (float-value-p x)
-                    x
-                  (list :float (float-value-witness)))
-         :exec x)
+         (float-value-p-aux (second x)))
     ///
-    (defrule float-value-fix-when-float-value-p
-      (implies (float-value-p x)
-               (equal (float-value-fix x) x))))
+    (defrule float-value-p-of-wrapped-float-value-witness
+      (float-value-p (list :float (float-value-witness)))))
+
+  (std::deffixer float-value-fix
+    :pred float-value-p
+    :body-fix (list :float (float-value-witness))
+    :parents (float-value)
+    :short "Fixer for @(tsee float-value).")
 
   (fty::deffixtype float-value
     :pred float-value-p
     :fix float-value-fix
     :equiv float-value-equiv
     :define t
-    :forward t
-    :topic float-value))
+    :forward t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defsection double-value
-  :parents (primitive-values)
   :short "Java @('double') values in the double value set [JLS:4.2.3]."
   :long
   (xdoc::topstring
@@ -184,35 +249,32 @@
 
   (define double-value-p (x)
     :returns (yes/no booleanp)
+    :parents (double-value)
+    :short "Recognizer for @(tsee double-value)."
     (and (tuplep 2 x)
          (eq (first x) :double)
-         (double-value-p-aux (second x))))
-
-  (define double-value-fix ((x double-value-p))
-    :returns (fixed-x double-value-p
-                      :hints (("Goal" :in-theory (enable double-value-p))))
-    (mbe :logic (if (double-value-p x)
-                    x
-                  (list :double (double-value-witness)))
-         :exec x)
+         (double-value-p-aux (second x)))
     ///
-    (defrule double-value-fix-when-double-value-p
-      (implies (double-value-p x)
-               (equal (double-value-fix x) x))))
+    (defrule double-value-p-of-wrapped-double-value-witness
+      (double-value-p (list :double (double-value-witness)))))
+
+  (std::deffixer double-value-fix
+    :pred double-value-p
+    :body-fix (list :double (double-value-witness))
+    :parents (double-value)
+    :short "Fixer for @(tsee double-value).")
 
   (fty::deffixtype double-value
     :pred double-value-p
     :fix double-value-fix
     :equiv double-value-equiv
     :define t
-    :forward t
-    :topic double-value))
+    :forward t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define floatx-param-p (k)
   :returns (yes/no booleanp)
-  :parents (primitive-values)
   :short "Recognize the possible parameters that describe
           a Java implementation's support of
           the float-extended-exponent value set [JLS:4.2.3]."
@@ -221,19 +283,18 @@
    (xdoc::p
     "A Java implementation
      may support a float-extended-exponent value set or not.
-     If it does, an implementation-dependent constant @($K$) in [JLS:4.2.3]
+     If it does, an implementation-dependent constant @($K$) [JLS:4.2.3]
      determines the exact values supported.")
    (xdoc::p
     "Our Java formalization is parameterized over the specifics of this support,
      via the value of the nullary function @(tsee floatx-param),
      which is constrained to be either @('nil') (indicating no support)
-     or a positive integer that is at least 11 (indicating @($K$))."))
+     or a positive integer that is at least 11 (the value of @($K$))."))
   (or (null k)
       (and (natp k)
            (>= k 11))))
 
 (defsection floatx-param
-  :parents (primitive-values)
   :short "Parameter that describes the support of
           the float-extended-exponent value set."
   :long (xdoc::topstring-@def "floatx-param")
@@ -263,7 +324,6 @@
 
 (define doublex-param-p (k)
   :returns (yes/no booleanp)
-  :parents (primitive-values)
   :short "Recognize the possible parameters that describe
           a Java implementation's support of
           the double-extended-exponent value set [JLS:4.2.3]."
@@ -272,19 +332,18 @@
    (xdoc::p
     "A Java implementation
      may support a double-extended-exponent value set or not.
-     If it does, an implementation-dependent constant @($K$) in [JLS:4.2.3]
+     If it does, an implementation-dependent constant @($K$) [JLS:4.2.3]
      determines the exact values supported.")
    (xdoc::p
     "Our Java formalization is parameterized over the specifics of this support,
      via the value of the nullary function @(tsee doublex-param),
      which is constrained to be either @('nil') (indicating no support)
-     or a positive integer that is at least 15 (indicating @($K$))."))
+     or a positive integer that is at least 15 (the value of @($K$))."))
   (or (null k)
       (and (natp k)
            (>= k 15))))
 
 (defsection doublex-param
-  :parents (primitive-values)
   :short "Parameter that describes the support of
           the double-extended-exponent value set."
   :long (xdoc::topstring-@def "doublex-param")
@@ -313,7 +372,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defsection floatx-value
-  :parents (primitive-values)
   :short "Java @('float') values in the float-extended-exponent value set
           [JLS.4.2.3]."
   :long
@@ -375,7 +433,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defsection doublex-value
-  :parents (primitive-values)
   :short "Java @('double') values in the double-extended-exponent value set
           [JLS.4.2.3]."
   :long
@@ -436,8 +493,267 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(fty::defflexsum integral-value
+  :short "Java integral values [JLS:4.2.1]."
+  (:char
+   :fields ((get :type char-value :acc-body x))
+   :ctor-body get
+   :cond (char-value-p x))
+  (:byte
+   :fields ((get :type byte-value :acc-body x))
+   :ctor-body get
+   :cond (byte-value-p x))
+  (:short
+   :fields ((get :type short-value :acc-body x))
+   :ctor-body get
+   :cond (short-value-p x))
+  (:int
+   :fields ((get :type int-value :acc-body x))
+   :ctor-body get
+   :cond (int-value-p x))
+  (:long
+   :fields ((get :type long-value :acc-body x))
+   :ctor-body get)
+  :prepwork ((local (in-theory (enable char-value-p
+                                       byte-value-p
+                                       short-value-p
+                                       int-value-p
+                                       long-value-p
+                                       char-value-fix
+                                       byte-value-fix
+                                       short-value-fix
+                                       int-value-fix
+                                       long-value-fix))))
+  ///
+
+  (local (in-theory (enable integral-value-p)))
+
+  (defrule integral-value-p-when-char-value-p
+    (implies (char-value-p x)
+             (integral-value-p x)))
+
+  (defrule integral-value-p-when-byte-value-p
+    (implies (byte-value-p x)
+             (integral-value-p x)))
+
+  (defrule integral-value-p-when-short-value-p
+    (implies (short-value-p x)
+             (integral-value-p x)))
+
+  (defrule integral-value-p-when-int-value-p
+    (implies (int-value-p x)
+             (integral-value-p x)))
+
+  (defrule integral-value-p-when-long-value-p
+    (implies (long-value-p x)
+             (integral-value-p x))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(fty::defflexsum numeric-value
+  :short "Java numeric values [JLS:4.2],
+          excluding extended-exponent values [JLS:4.2.3]."
+  (:char
+   :fields ((get :type char-value :acc-body x))
+   :ctor-body get
+   :cond (char-value-p x))
+  (:byte
+   :fields ((get :type byte-value :acc-body x))
+   :ctor-body get
+   :cond (byte-value-p x))
+  (:short
+   :fields ((get :type short-value :acc-body x))
+   :ctor-body get
+   :cond (short-value-p x))
+  (:int
+   :fields ((get :type int-value :acc-body x))
+   :ctor-body get
+   :cond (int-value-p x))
+  (:long
+   :fields ((get :type long-value :acc-body x))
+   :ctor-body get
+   :cond (long-value-p x))
+  (:float
+   :fields ((get :type float-value :acc-body x))
+   :ctor-body get
+   :cond (float-value-p x))
+  (:double
+   :fields ((get :type double-value :acc-body x))
+   :ctor-body get)
+  :prepwork ((local (in-theory (enable char-value-p
+                                       byte-value-p
+                                       short-value-p
+                                       int-value-p
+                                       long-value-p
+                                       float-value-p
+                                       double-value-p
+                                       char-value-fix
+                                       byte-value-fix
+                                       short-value-fix
+                                       int-value-fix
+                                       long-value-fix
+                                       float-value-fix
+                                       double-value-fix))))
+  ///
+
+  (local (in-theory (enable numeric-value-p)))
+
+  (defrule numeric-value-p-when-integral-value-p
+    (implies (integral-value-p x)
+             (numeric-value-p x))
+    :enable integral-value-p)
+
+  (defrule numeric-value-p-when-float-value-p
+    (implies (float-value-p x)
+             (numeric-value-p x)))
+
+  (defrule numeric-value-p-when-double-value-p
+    (implies (double-value-p x)
+             (numeric-value-p x))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defsection numericx-value
+  :short "Java numeric values [JLS:4.2],
+          including extended-exponent values [JLS:4.2.3]."
+
+  (define numericx-value-p (x)
+    :returns (yes/no booleanp)
+    :parents (numericx-value)
+    :short "Recognizer for @(tsee numericx-value)."
+    (or (numeric-value-p x)
+        (floatx-value-p x)
+        (doublex-value-p x))
+    ///
+
+    (defrule numericx-value-p-when-numeric-value-p
+      (implies (numeric-value-p x)
+               (numericx-value-p x)))
+
+    (defrule numericx-value-p-when-floatx-value-p
+      (implies (floatx-value-p x)
+               (numericx-value-p x)))
+
+    (defrule numericx-value-p-when-doublex-value-p
+      (implies (doublex-value-p x)
+               (numericx-value-p x))))
+
+  (std::deffixer numericx-value-fix
+    :pred numericx-value-p
+    :body-fix (char-value 0))
+
+  (fty::deffixtype numericx-value
+    :pred numericx-value-p
+    :fix numericx-value-fix
+    :equiv numericx-value-equiv
+    :define t
+    :forward t))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(fty::defflexsum primitive-value
+  :short "Java primitive values [JLS:4.2],
+          excluding extended-exponent values [JLS:4.2.3]."
+  (:boolean
+   :fields ((get :type boolean-value :acc-body x))
+   :ctor-body get
+   :cond (boolean-value-p x))
+  (:char
+   :fields ((get :type char-value :acc-body x))
+   :ctor-body get
+   :cond (char-value-p x))
+  (:byte
+   :fields ((get :type byte-value :acc-body x))
+   :ctor-body get
+   :cond (byte-value-p x))
+  (:short
+   :fields ((get :type short-value :acc-body x))
+   :ctor-body get
+   :cond (short-value-p x))
+  (:int
+   :fields ((get :type int-value :acc-body x))
+   :ctor-body get
+   :cond (int-value-p x))
+  (:long
+   :fields ((get :type long-value :acc-body x))
+   :ctor-body get
+   :cond (long-value-p x))
+  (:float
+   :fields ((get :type float-value :acc-body x))
+   :ctor-body get
+   :cond (float-value-p x))
+  (:double
+   :fields ((get :type double-value :acc-body x))
+   :ctor-body get)
+  :prepwork ((local (in-theory (enable boolean-value-p
+                                       char-value-p
+                                       byte-value-p
+                                       short-value-p
+                                       int-value-p
+                                       long-value-p
+                                       float-value-p
+                                       double-value-p
+                                       boolean-value-fix
+                                       char-value-fix
+                                       byte-value-fix
+                                       short-value-fix
+                                       int-value-fix
+                                       long-value-fix
+                                       float-value-fix
+                                       double-value-fix))))
+  ///
+
+  (local (in-theory (enable primitive-value-p)))
+
+  (defrule primitive-value-p-when-boolean-value-p
+    (implies (boolean-value-p x)
+             (primitive-value-p x)))
+
+  (defrule primitive-value-p-when-numeric-value-p
+    (implies (numeric-value-p x)
+             (primitive-value-p x))
+    :enable numeric-value-p))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defsection primitivex-value
+  :short "Java primitive values [JLS:4.2],
+          including extended-exponent values [JLS:4.2.3]."
+
+  (define primitivex-value-p (x)
+    :returns (yes/no booleanp)
+    :parents (primitivex-value)
+    :short "Recognizer for @(tsee primitivex-value)."
+    (or (primitive-value-p x)
+        (floatx-value-p x)
+        (doublex-value-p x))
+    ///
+
+    (defrule primitivex-value-p-when-primitive-value-p
+      (implies (primitive-value-p x)
+               (primitivex-value-p x)))
+
+    (defrule primitivex-value-p-when-numericx-value-p
+      (implies (numericx-value-p x)
+               (primitivex-value-p x))
+      :enable numericx-value-p))
+
+  (std::deffixer primitivex-value-fix
+    :pred primitivex-value-p
+    :body-fix (char-value 0)
+    :parents (primitivex-value)
+    :short "Fixer for @(tsee primitivex-value).")
+
+  (fty::deffixtype primitivex-value
+    :pred primitivex-value-p
+    :fix primitivex-value-fix
+    :equiv primitivex-value-equiv
+    :define t
+    :forward t))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defruled disjoint-primitive-values
-  :parents (primitive-values)
   :short "The tagging keywords make all the primitive values disjoint."
   (and (implies (boolean-value-p x)
                 (and (not (char-value-p x))
@@ -503,245 +819,3 @@
            double-value-p
            floatx-value-p
            doublex-value-p))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(fty::defflexsum integral-value
-  :parents (primitive-values)
-  :short "Java integral values [JLS:4.2.1]."
-  (:char
-   :fields ((get :type char-value :acc-body x))
-   :ctor-body get
-   :cond (char-value-p x))
-  (:byte
-   :fields ((get :type byte-value :acc-body x))
-   :ctor-body get
-   :cond (byte-value-p x))
-  (:short
-   :fields ((get :type short-value :acc-body x))
-   :ctor-body get
-   :cond (short-value-p x))
-  (:int
-   :fields ((get :type int-value :acc-body x))
-   :ctor-body get
-   :cond (int-value-p x))
-  (:long
-   :fields ((get :type long-value :acc-body x))
-   :ctor-body get)
-  :prepwork ((local (in-theory (enable disjoint-primitive-values))))
-  ///
-
-  (local (in-theory (enable integral-value-p)))
-
-  (defrule integral-value-p-when-char-value-p
-    (implies (char-value-p x)
-             (integral-value-p x)))
-
-  (defrule integral-value-p-when-byte-value-p
-    (implies (byte-value-p x)
-             (integral-value-p x)))
-
-  (defrule integral-value-p-when-short-value-p
-    (implies (short-value-p x)
-             (integral-value-p x)))
-
-  (defrule integral-value-p-when-int-value-p
-    (implies (int-value-p x)
-             (integral-value-p x)))
-
-  (defrule integral-value-p-when-long-value-p
-    (implies (long-value-p x)
-             (integral-value-p x))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(fty::defflexsum numeric-value
-  :parents (primitive-values)
-  :short "Java numeric values [JLS:4.2],
-          excluding extended-exponent values [JLS:4.2.3]."
-  (:char
-   :fields ((get :type char-value :acc-body x))
-   :ctor-body get
-   :cond (char-value-p x))
-  (:byte
-   :fields ((get :type byte-value :acc-body x))
-   :ctor-body get
-   :cond (byte-value-p x))
-  (:short
-   :fields ((get :type short-value :acc-body x))
-   :ctor-body get
-   :cond (short-value-p x))
-  (:int
-   :fields ((get :type int-value :acc-body x))
-   :ctor-body get
-   :cond (int-value-p x))
-  (:long
-   :fields ((get :type long-value :acc-body x))
-   :ctor-body get
-   :cond (long-value-p x))
-  (:float
-   :fields ((get :type float-value :acc-body x))
-   :ctor-body get
-   :cond (float-value-p x))
-  (:double
-   :fields ((get :type double-value :acc-body x))
-   :ctor-body get)
-  :prepwork ((local (in-theory (enable disjoint-primitive-values))))
-  ///
-
-  (local (in-theory (enable numeric-value-p)))
-
-  (defrule numeric-value-p-when-integral-value-p
-    (implies (integral-value-p x)
-             (numeric-value-p x))
-    :enable integral-value-p)
-
-  (defrule numeric-value-p-when-float-value-p
-    (implies (float-value-p x)
-             (numeric-value-p x)))
-
-  (defrule numeric-value-p-when-double-value-p
-    (implies (double-value-p x)
-             (numeric-value-p x))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defsection numericx-value
-  :parents (primitive-values)
-  :short "Java numeric values [JLS:4.2],
-          including extended-exponent values [JLS:4.2.3]."
-
-  (define numericx-value-p (x)
-    :returns (yes/no booleanp)
-    :parents (numericx-value)
-    :short "Recognizer for @(tsee numericx-value)."
-    (or (numeric-value-p x)
-        (floatx-value-p x)
-        (doublex-value-p x))
-    ///
-
-    (defrule numericx-value-p-when-numeric-value-p
-      (implies (numeric-value-p x)
-               (numericx-value-p x)))
-
-    (defrule numericx-value-p-when-floatx-value-p
-      (implies (floatx-value-p x)
-               (numericx-value-p x)))
-
-    (defrule numericx-value-p-when-doublex-value-p
-      (implies (doublex-value-p x)
-               (numericx-value-p x))))
-
-  (define numericx-value-fix ((x numericx-value-p))
-    :returns (fixed-x numericx-value-p)
-    :parents (numericx-value)
-    :short "Fixer for @(tsee numericx-value)."
-    (mbe :logic (if (numericx-value-p x) x (char-value 0))
-         :exec x)
-    ///
-    (defrule numericx-value-fix-when-numericx-value-p
-      (implies (numericx-value-p x)
-               (equal (numericx-value-fix x) x))))
-
-  (fty::deffixtype numericx-value
-    :pred numericx-value-p
-    :fix numericx-value-fix
-    :equiv numericx-value-equiv
-    :define t
-    :forward t
-    :topic numericx-value))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(fty::defflexsum primitive-value
-  :parents (primitive-values)
-  :short "Java primitive values [JLS:4.2],
-          excluding extended-exponent values [JLS:4.2.3]."
-  (:boolean
-   :fields ((get :type boolean-value :acc-body x))
-   :ctor-body get
-   :cond (boolean-value-p x))
-  (:char
-   :fields ((get :type char-value :acc-body x))
-   :ctor-body get
-   :cond (char-value-p x))
-  (:byte
-   :fields ((get :type byte-value :acc-body x))
-   :ctor-body get
-   :cond (byte-value-p x))
-  (:short
-   :fields ((get :type short-value :acc-body x))
-   :ctor-body get
-   :cond (short-value-p x))
-  (:int
-   :fields ((get :type int-value :acc-body x))
-   :ctor-body get
-   :cond (int-value-p x))
-  (:long
-   :fields ((get :type long-value :acc-body x))
-   :ctor-body get
-   :cond (long-value-p x))
-  (:float
-   :fields ((get :type float-value :acc-body x))
-   :ctor-body get
-   :cond (float-value-p x))
-  (:double
-   :fields ((get :type double-value :acc-body x))
-   :ctor-body get)
-  :prepwork ((local (in-theory (enable disjoint-primitive-values))))
-  ///
-
-  (local (in-theory (enable primitive-value-p)))
-
-  (defrule primitive-value-p-when-boolean-value-p
-    (implies (boolean-value-p x)
-             (primitive-value-p x)))
-
-  (defrule primitive-value-p-when-numeric-value-p
-    (implies (numeric-value-p x)
-             (primitive-value-p x))
-    :enable numeric-value-p))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defsection primitivex-value
-  :parents (primitive-values)
-  :short "Java primitive values [JLS:4.2],
-          including extended-exponent values [JLS:4.2.3]."
-
-  (define primitivex-value-p (x)
-    :returns (yes/no booleanp)
-    :parents (primitivex-value)
-    :short "Recognizer for @(tsee primitivex-value)."
-    (or (primitive-value-p x)
-        (floatx-value-p x)
-        (doublex-value-p x))
-    ///
-
-    (defrule primitivex-value-p-when-primitive-value-p
-      (implies (primitive-value-p x)
-               (primitivex-value-p x)))
-
-    (defrule primitivex-value-p-when-numericx-value-p
-      (implies (numericx-value-p x)
-               (primitivex-value-p x))
-      :enable numericx-value-p))
-
-  (define primitivex-value-fix ((x primitivex-value-p))
-    :returns (fixed-x primitivex-value-p)
-    :parents (primitivex-value)
-    :short "Fixer for @(tsee primitivex-value)."
-    (mbe :logic (if (primitivex-value-p x) x (char-value 0))
-         :exec x)
-    ///
-    (defrule primitivex-value-fix-when-primitivex-value-p
-      (implies (primitivex-value-p x)
-               (equal (primitivex-value-fix x) x))))
-
-  (fty::deffixtype primitivex-value
-    :pred primitivex-value-p
-    :fix primitivex-value-fix
-    :equiv primitivex-value-equiv
-    :define t
-    :forward t
-    :topic primitivex-value))

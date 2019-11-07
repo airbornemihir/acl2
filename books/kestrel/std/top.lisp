@@ -11,6 +11,9 @@
 (in-package "ACL2")
 
 (include-book "basic/top")
+(include-book "strings/top")
+(include-book "system/top")
+(include-book "util/top")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -18,9 +21,9 @@
   :parents (kestrel-books std)
   :short
   (xdoc::topstring "Extensions of "
-                   (xdoc::seeurl "std" "Std")
+                   (xdoc::seetopic "std" "Std")
                    " library in the "
-                   (xdoc::seeurl "kestrel-books" "Kestrel Books")
+                   (xdoc::seetopic "kestrel-books" "Kestrel Books")
                    ".")
   :long
   (xdoc::topstring

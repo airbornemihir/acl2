@@ -13,6 +13,13 @@
 (include-book "ecurve/top")
 (include-book "ecdsa/top")
 (include-book "interfaces/top")
+(include-book "keccak/top")
+(include-book "hmac/top")
+(include-book "padding/top")
+(include-book "sha-2/top")
+(include-book "kdf/top")
+
+(include-book "attachments/top")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

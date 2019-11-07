@@ -90,7 +90,9 @@
        
        ((mv ?er res state) 
         (acl2::state-global-let*
-         ((acl2::guard-checking-on :none))
+;         ((acl2::guard-checking-on :none))
+;; PETE: now controlled by the global cgen::cgen-guard-checking
+         ((acl2::guard-checking-on (@ cgen-guard-checking)))
          (trans-eval
           `(let* ,A
              (declare (ignorable ,@(strip-cars A)))
@@ -580,7 +582,7 @@ history s-hist.")
 
 ;; (defun keywordify (sym)
 ;;   (declare (xargs :guard (symbolp sym)))
-;;   (intern-in-package-of-symbol (symbol-name sym) :key))
+;;   (acl2s::fix-intern-in-pkg-of-sym (symbol-name sym) :key))
 
 ;; (defun keywordify-lst (syms)
 ;;   (declare (xargs :guard (symbol-listp syms)))
@@ -833,7 +835,10 @@ history s-hist.")
              (acl2::state-global-let*
               ((acl2::inhibit-output-lst 
                 (cond ((debug-flag vl) '(summary))
-                      (t #!acl2(set-difference-eq *valid-output-names* '(error prove))))))
+                      (t #!acl2(set-difference-eq *valid-output-names* '(error))))))
+; Pete: replaced the line below to get rid of annoying "Q.E.D."
+; messages when testing.              
+;                     (t #!acl2(set-difference-eq *valid-output-names* '(error prove))))))
 ; Q: Why is here a wrapper call to trans-eval?
 ; A: To catch some hard errors! (see the email to Matt dated 3/20/2013)
               (trans-eval

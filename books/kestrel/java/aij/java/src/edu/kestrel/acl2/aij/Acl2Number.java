@@ -6,9 +6,11 @@
 
 package edu.kestrel.acl2.aij;
 
+import java.math.BigInteger;
+
 /**
  * Representation of ACL2 numbers.
- * These are the ACL2 values that satisfy {@code acl2-numberp}.
+ * These are the values that satisfy {@code acl2-numberp}.
  * <p>
  * They consist of
  * rationals (subclass {@link Acl2Rational}) and
@@ -29,8 +31,10 @@ public abstract class Acl2Number extends Acl2Value {
     }
 
     /**
-     * Supports the native implementation of
-     * the {@code acl2-numberp} ACL2 function.
+     * Checks if this number is a number, which is always true.
+     * This is consistent with the {@code acl2-numberp} ACL2 function.
+     *
+     * @return The symbol {@code t}.
      */
     @Override
     Acl2Symbol acl2Numberp() {
@@ -38,8 +42,174 @@ public abstract class Acl2Number extends Acl2Value {
     }
 
     /**
-     * Supports the native implementation of
-     * the {@code realpart} ACL2 function.
+     * Negates (arithmetically) this number,
+     * consistently with the {@code unary--} ACL2 function.
+     *
+     * @return The negation of this number.
+     */
+    @Override
+    Acl2Number negate() {
+        // -(a+bi) is (-a)+(-b)i:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        return Acl2Number.make(a.negate(), b.negate());
+    }
+
+    /**
+     * Reciprocates (arithmetically) this number,
+     * consistently with the {@code unary-/} ACL2 function.
+     *
+     * @return The reciprocal of this number.
+     */
+    @Override
+    Acl2Number reciprocate() {
+        // 1/(a+bi) is (a/(aa+bb))-(b/(aa+bb))i:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        Acl2Rational aa = a.multiplyRational(a);
+        Acl2Rational bb = b.multiplyRational(b);
+        Acl2Rational aabb = aa.addRational(bb);
+        Acl2Rational aabbInv = aabb.reciprocate();
+        Acl2Rational resultReal = a.multiplyRational(aabbInv);
+        Acl2Rational resultImag = b.negate().multiplyRational(aabbInv);
+        return Acl2Number.make(resultReal, resultImag);
+    }
+
+    /**
+     * Adds the argument value to this number,
+     * consistently with the {@code binary-+} ACL2 function.
+     *
+     * @param other The value to add to this number. It is never {@code null}.
+     * @return The sum of this number with the argument value.
+     */
+    @Override
+    Acl2Number addValue(Acl2Value other) {
+        return other.addNumber(this);
+    }
+
+    /**
+     * Adds the argument number to this number,
+     * consistently with the {@code binary-+} ACL2 function.
+     *
+     * @param other The number to add to this number. It is never {@code null}.
+     * @return The sum of this number with the argument number.
+     */
+    @Override
+    Acl2Number addNumber(Acl2Number other) {
+        // (a+bi)+(c+di) is (a+c)+(b+d)i:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        Acl2Rational c = other.realpart();
+        Acl2Rational d = other.imagpart();
+        return Acl2Number.make(a.addRational(c), b.addRational(d));
+    }
+
+    /**
+     * Adds the argument rational to this number,
+     * consistently with the {@code binary-+} ACL2 function.
+     *
+     * @param other The rational to add to this number.
+     *              It is never {@code null}.
+     * @return The sum of this number with the argument rational.
+     */
+    @Override
+    Acl2Number addRational(Acl2Rational other) {
+        // (a+bi)+c is (a+c)+bi:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        return Acl2Number.make(a.addRational(other), b);
+    }
+
+    /**
+     * Adds the argument integer to this number,
+     * consistently with the {@code binary-+} ACL2 function.
+     *
+     * @param other The integer to add to this number.
+     *              It is never {@code null}.
+     * @return The sum of this number with the argument integer.
+     */
+    @Override
+    Acl2Number addInteger(Acl2Integer other) {
+        // (a+bi)+c is (a+c)+bi:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        return Acl2Number.make(a.addRational(other), b);
+    }
+
+    /**
+     * Multiplies the argument value to this number,
+     * consistently with the {@code binary-*} ACL2 function.
+     *
+     * @param other The value by which to multiply this number.
+     *              It is never {@code null}.
+     * @return The product of this number with the argument value.
+     */
+    @Override
+    Acl2Number multiplyValue(Acl2Value other) {
+        return other.multiplyNumber(this);
+    }
+
+    /**
+     * Multiplies the argument number to this number,
+     * consistently with the {@code binary-*} ACL2 function.
+     *
+     * @param other The number by which to multiply this number.
+     *              It is never {@code null}.
+     * @return The product of this number with the argument number.
+     */
+    @Override
+    Acl2Number multiplyNumber(Acl2Number other) {
+        // (a+bi)*(c+di) is (ac-bd)+(bc+ad)i:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        Acl2Rational c = other.realpart();
+        Acl2Rational d = other.imagpart();
+        Acl2Rational ac = a.multiplyRational(c);
+        Acl2Rational bd = b.multiplyRational(d);
+        Acl2Rational bc = b.multiplyRational(c);
+        Acl2Rational ad = a.multiplyRational(d);
+        return Acl2Number.make(ac.addRational(bd.negate()), bc.addRational(ad));
+    }
+
+    /**
+     * Multiplies the argument rational to this number,
+     * consistently with the {@code binary-*} ACL2 function.
+     *
+     * @param other The rational by which to multiply this number.
+     *              It is never {@code null}.
+     * @return The product of this number with the argument rational.
+     */
+    @Override
+    Acl2Number multiplyRational(Acl2Rational other) {
+        // (a+bi)*c is (ac)+(bc)i:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        return Acl2Number.make
+                (a.multiplyRational(other), b.multiplyRational(other));
+    }
+
+    /**
+     * Multiplies the argument integer to this number,
+     * consistently with the {@code binary-*} ACL2 function.
+     *
+     * @param other The integer by which to multiply this number.
+     *              It is never {@code null}.
+     * @return The product of this number with the argument integer.
+     */
+    @Override
+    Acl2Number multiplyInteger(Acl2Integer other) {
+        // (a+bi)*c is (ac)+(bc)i:
+        Acl2Rational a = this.realpart();
+        Acl2Rational b = this.imagpart();
+        return Acl2Number.make
+                (a.multiplyRational(other), b.multiplyRational(other));
+    }
+
+    /**
+     * Returns the real part of this number,
+     * consistently with the {@code realpart} ACL2 function.
+     *
+     * @return The real part of this number.
      */
     @Override
     Acl2Rational realpart() {
@@ -47,8 +217,10 @@ public abstract class Acl2Number extends Acl2Value {
     }
 
     /**
-     * Supports the native implementation of
-     * the {@code imagpart} ACL2 function.
+     * Returns the imaginary part of this number,
+     * consistently with the {@code imagpart} ACL2 function.
+     *
+     * @return The imaginary part of this number.
      */
     @Override
     Acl2Rational imagpart() {
@@ -56,23 +228,156 @@ public abstract class Acl2Number extends Acl2Value {
     }
 
     /**
-     * Coerce this ACL2 number to an ACL2 number,
-     * i.e. just return this ACL2 number.
+     * Coerce this number to a number, which is a no-op.
      * This is consistent with the {@code fix} ACL2 function.
+     *
+     * @return This number, unchanged.
      */
     @Override
     Acl2Number fix() {
         return this;
     }
 
+    /**
+     * Compares this number with the argument character for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The character to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToCharacter(Acl2Character o) {
+        // numbers are less than characters:
+        return -1;
+    }
+
+    /**
+     * Compares this number with the argument string for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The string to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToString(Acl2String o) {
+        // numbers are less than strings:
+        return -1;
+    }
+
+    /**
+     * Compares this number with the argument symbol for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The symbol to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToSymbol(Acl2Symbol o) {
+        // numbers are less than symbols:
+        return -1;
+    }
+
+    /**
+     * Compares this number with the argument number for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The number to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToNumber(Acl2Number o) {
+        // compare real and imaginary parts lexicographically:
+        int realCmp = this.realpart().compareToRational(o.realpart());
+        if (realCmp != 0)
+            return realCmp;
+        else
+            return this.imagpart().compareToRational(o.imagpart());
+    }
+
+    /**
+     * Compares this number with the argument rational for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The rational to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToRational(Acl2Rational o) {
+        // compare real and imaginary parts lexicographically:
+        int realCmp = this.realpart().compareToRational(o.realpart());
+        if (realCmp != 0)
+            return realCmp;
+        else
+            // the imaginary part is always 0 for the rational:
+            return this.imagpart().compareToInteger(Acl2Integer.ZERO);
+    }
+
+    /**
+     * Compares this number with the argument integer for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The integer to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToInteger(Acl2Integer o) {
+        // compare real and imaginary parts lexicographically:
+        int realCmp = this.realpart().compareToRational(o.realpart());
+        if (realCmp != 0)
+            return realCmp;
+        else
+            // the imaginary part is always 0 for the integer:
+            return this.imagpart().compareToInteger(Acl2Integer.ZERO);
+    }
+
+    /**
+     * Compares this number with the argument {@code cons} pair for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The {@code cons} pair to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this number is less than, equal to, or greater than the argument.
+     */
+    @Override
+    int compareToConsPair(Acl2ConsPair o) {
+        // numbers are less than cons pairs:
+        return -1;
+    }
+
     //////////////////////////////////////// public members:
 
     /**
-     * Returns an ACL2 number with the given real and imaginary parts.
-     * If the imaginary part is 0, the result is an ACL2 rational,
+     * Compares this number with the argument value for order.
+     * This is consistent with the {@code lexorder} ACL2 function.
+     *
+     * @param o The value to compare this number with.
+     * @return A negative integer, zero, or a positive integer as
+     * this value is less than, equal to, or greater than the argument.
+     * @throws NullPointerException If the argument is {@code null}.
+     */
+    @Override
+    public int compareTo(Acl2Value o) {
+        if (o == null)
+            throw new NullPointerException();
+        return -o.compareToNumber(this);
+    }
+
+    /**
+     * Returns a number with the given real and imaginary parts.
+     * If the imaginary part is 0, the result is a rational,
      * according to the rule of complex canonicalization in Common Lisp.
      *
-     * @throws IllegalArgumentException if realpart or imaginaryPart is null
+     * @param realPart      The real part of the number.
+     * @param imaginaryPart The imaginary part of the number.
+     * @return The number.
+     * @throws IllegalArgumentException If {@code realpart} or
+     *                                  {@code imaginaryPart} is {@code null}.
      */
     public static Acl2Number make(Acl2Rational realPart,
                                   Acl2Rational imaginaryPart) {
@@ -83,16 +388,71 @@ public abstract class Acl2Number extends Acl2Value {
         if (imaginaryPart.equals(Acl2Integer.ZERO))
             return realPart;
         else
-            return Acl2ComplexRational.make(realPart, imaginaryPart);
+            return Acl2ComplexRational.makeInternal(realPart, imaginaryPart);
     }
 
     /**
-     * Returns the real part of this ACL2 number.
+     * Returns a number with the given real and imaginary parts.
+     * If the imaginary part is 0, the result is a rational,
+     * according to the rule of complex canonicalization in Common Lisp.
+     *
+     * @param realPart      The real part of the number.
+     * @param imaginaryPart The imaginary part of the number.
+     * @return The number.
+     */
+    public static Acl2Number make(int realPart, int imaginaryPart) {
+        return Acl2Number.make
+                (Acl2Integer.make(realPart),
+                        Acl2Integer.make(imaginaryPart));
+    }
+
+    /**
+     * Returns a number with the given real and imaginary parts.
+     * If the imaginary part is 0, the result is a rational,
+     * according to the rule of complex canonicalization in Common Lisp.
+     *
+     * @param realPart      The real part of the number.
+     * @param imaginaryPart The imaginary part of the number.
+     * @return The number.
+     */
+    public static Acl2Number make(long realPart, long imaginaryPart) {
+        return Acl2Number.make
+                (Acl2Integer.make(realPart),
+                        Acl2Integer.make(imaginaryPart));
+    }
+
+    /**
+     * Returns a number with the given real and imaginary parts.
+     * If the imaginary part is 0, the result is a rational,
+     * according to the rule of complex canonicalization in Common Lisp.
+     *
+     * @param realPart      The real part of the number.
+     * @param imaginaryPart The imaginary part of the number.
+     * @return The number.
+     * @throws IllegalArgumentException If {@code realpart} or
+     *                                  {@code imaginaryPart} is {@code null}.
+     */
+    public static Acl2Number make(BigInteger realPart,
+                                  BigInteger imaginaryPart) {
+        return Acl2Number.make
+                (Acl2Integer.make(realPart),
+                        Acl2Integer.make(imaginaryPart));
+    }
+
+    /**
+     * Returns the real part of this number.
+     * This is consistent with the {@code realpart} ACL2 function.
+     *
+     * @return The real part of this number.
      */
     public abstract Acl2Rational getRealPart();
 
     /**
-     * Returns the imaginary part of this ACL2 number.
+     * Returns the imaginary part of this number.
+     * This is consistent with the {@code imaggpart} ACL2 function.
+     *
+     * @return The imaginary part of this number.
      */
     public abstract Acl2Rational getImaginaryPart();
+
 }

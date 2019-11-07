@@ -27,7 +27,8 @@
             bytes-to-bits-little
             chars=>nats
             define
-            defmap-simple
+            defxdoc
+	    defmap-simple
             firstn
             flatten
             getbit
@@ -40,7 +41,7 @@
             patbind-when
             repeat
             reverse-list
-            set-bit
+            putbit
             shr
             slice
             string=>nats

@@ -1512,6 +1512,7 @@
                     (nonconstructive-axiom-names nil)
                     (standard-theories (nil nil nil nil))
                     (current-theory nil)
+                    (current-theory-length 0)
                     (current-theory-augmented nil)
                     (current-theory-index -1)
                     (generalize-rules nil)
@@ -3189,7 +3190,8 @@
                    'table-alist
                    *initial-return-last-table*
                    (initialize-invariant-risk wrld)))))
-         (wrld2 (update-current-theory (current-theory1 wrld nil nil) wrld1)))
+         (thy (current-theory1 wrld nil nil))
+         (wrld2 (update-current-theory thy (length thy) wrld1)))
     (add-command-landmark
      :logic
      '(exit-boot-strap-mode)
@@ -3326,32 +3328,35 @@
           (t
            (er-let* ((wrld1 (chk-just-new-name name nil 'theory nil ctx wrld
                                                state)))
-             (mv-let (theory theory-augmented-ignore)
+             (let ((length0 (length theory0)))
+               (mv-let (theory theory-augmented-ignore)
 
 ; The following call is similar to the one in update-current-theory.  But here,
 ; our aim is just to create an appropriate theory, without extending the
 ; world.
 
-               (extend-current-theory
-                (global-val 'current-theory wrld)
-                theory0
-                :none
-                wrld)
-               (declare (ignore theory-augmented-ignore))
-               (let ((wrld2 (putprop name 'theory theory wrld1)))
+                 (extend-current-theory
+                  (global-val 'current-theory wrld)
+                  (global-val 'current-theory-length wrld)
+                  theory0
+                  length0
+                  :none
+                  wrld)
+                 (declare (ignore theory-augmented-ignore))
+                 (let ((wrld2 (putprop name 'theory theory wrld1)))
 
 ; Note:  We do not permit DEFTHEORY to be made redundant.  If this
 ; is changed, change the text of the :doc for redundant-events.
 
-                 (install-event (length theory)
-                                event-form
-                                'deftheory
-                                name
-                                nil
-                                nil
-                                nil ; global theory is unchanged
-                                nil
-                                wrld2 state))))))))))))
+                   (install-event length0
+                                  event-form
+                                  'deftheory
+                                  name
+                                  nil
+                                  nil
+                                  nil ; global theory is unchanged
+                                  nil
+                                  wrld2 state)))))))))))))
 
 ; And now we move on to the in-theory event, in which we process a theory
 ; expression into a theory and then load it into the global enabled
@@ -3404,11 +3409,13 @@
         (t
          (let* ((ens1 (ens state))
                 (force-xnume-en1 (enabled-numep *force-xnume* ens1))
-                (imm-xnume-en1 (enabled-numep *immediate-force-modep-xnume* ens1))
-                (wrld1 (update-current-theory theory0 wrld))
+                (imm-xnume-en1 (enabled-numep *immediate-force-modep-xnume*
+                                              ens1))
+                (theory0-length (length theory0))
+                (wrld1 (update-current-theory theory0 theory0-length wrld))
                 (val (if (f-get-global 'script-mode state)
                          :CURRENT-THEORY-UPDATED
-                       (list :NUMBER-OF-ENABLED-RUNES (length theory0)))))
+                       (list :NUMBER-OF-ENABLED-RUNES theory0-length))))
 
 ; Note:  We do not permit IN-THEORY to be made redundant.  If this
 ; is changed, change the text of the :doc for redundant-events.
@@ -3448,8 +3455,9 @@
 
 ; After Version_3.0, the following differs from the fancier in-theory-fn.  The
 ; latter calls update-current-theory to deal with the 'current-theory and
-; related properties, 'current-theory-augmented and 'current-theory-index.
-; Someday we may want to make analogous changes to the present function.
+; related properties: 'current-theory-augmented, 'current-theory-length, and
+; 'current-theory-index.  Someday we may want to make analogous changes to the
+; present function.
 
   (when-logic
    "IN-ARITHMETIC-THEORY"
@@ -4835,7 +4843,7 @@
 (defun raw-arity (form wrld state)
   (cond
    ((atom form) 1)
-   ((eq (car form) 'mv)
+   ((member-eq (car form) '(mv swap-stobjs))
     (length (cdr form)))
    ((eq (car form) 'if)
     (let ((arity1 (raw-arity (caddr form) wrld state)))
@@ -11847,11 +11855,6 @@
                (access cert-obj cert-obj :pre-alist-abs)))
           (t (value cert-obj)))))
 
-(defun symbol-name-equal (x str)
-  (declare (xargs :guard (stringp str)))
-  (and (symbolp x)
-       (equal (symbol-name x) str)))
-
 (defun chk-acceptable-certify-book1 (user-book-name file dir k cmds cert-obj
                                                     cbds names cert-op
                                                     suspect-book-action-alist
@@ -15454,7 +15457,8 @@
              (let ((temp (svref *inside-absstobj-update* 0)))
                (cond
                 ((or (null temp)
-                     (eql temp 0))
+                     (eql temp 0)
+                     (eq temp :ignore))
                  (value nil))
                 (t
                  (let ((msg
@@ -17593,7 +17597,7 @@
                               ((t)
                                `((verify-guards ,name
                                    ,@(and guard-hints
-                                          (list :guard-hints guard-hints)))))
+                                          (list :hints guard-hints)))))
                               ((nil)
                                nil)
                               (otherwise ; '?
@@ -17601,7 +17605,7 @@
                                   ,guard-p
                                   ,name
                                   ,@(and guard-hints
-                                         (list :guard-hints
+                                         (list :hints
                                                guard-hints))))))))))))))))))
 
 (defmacro defun-sk (&whole form name args &rest rest)
@@ -17828,6 +17832,32 @@
              "The :resizable keyword is only legal for array types, hence is ~
               illegal for the ~x0 field of ~x1."
              field name))
+        ((and (consp type)
+              (eq (car type) 'hash-table))
+         (cond ((not (and (true-listp type)
+                          (member (length type) '(2 3))))
+                (er soft ctx
+                    "A hash-table type must be a true-list of length 2 or 3, ~
+                     interpreted as (HASH-TABLE TEST) or (HASH-TABLE TEST ~
+                     SIZE).  The type ~x0 is thus illegal.~%"
+                    type))
+               ((not (member (cadr type)
+                             '(eq eql equal hons-equal)))
+                (er soft ctx
+                    "A hash-table type must be specified as (HASH-TABLE TEST) ~
+                     or (HASH-TABLE TEST SIZE), where test is ~v0.  The test ~
+                     given was ~x1.~%"
+                    '(eq eql hons-equal equal)
+                    (and (consp (cdr type))
+                         (cadr type))))
+               ((and (cddr type)
+                     (not (posp (caddr type))))
+                (er soft ctx
+                    "A hash-table type of the form (HASH-TABLE TEST SIZE) ~
+                     must specify SIZE as a positive integer.  The type ~x0 ~
+                     is thus illegal.~%"
+                    type))
+               (t (value nil))))
         (t (let* ((stobjp (stobjp type t wrld))
                   (type-term ; used only when (not stobjp)
                    (and (not stobjp) ; optimization
@@ -17958,10 +17988,7 @@
                                                 (cdr (car field-descriptors))))
                            t)
                      t))
-             (key2 (if (and (consp type)
-                            (eq (car type) 'array))
-                       :array
-                     :non-array)))
+             (key2 (defstobj-fnname-key2 type)))
         (chk-acceptable-defstobj-renaming
          name (cdr field-descriptors) renaming ctx state
          (list* (defstobj-fnname field :updater key2 nil)
@@ -17970,6 +17997,14 @@
                 (cond ((eq key2 :array)
                        (list* (defstobj-fnname field :length key2 nil)
                               (defstobj-fnname field :resize key2 nil)
+                              default-names))
+                      ((eq key2 :hash-table)
+                       (list* (defstobj-fnname field :boundp key2 nil)
+                              (defstobj-fnname field :accessor? key2 nil)
+                              (defstobj-fnname field :remove key2 nil)
+                              (defstobj-fnname field :count key2 nil)
+                              (defstobj-fnname field :clear key2 nil)
+                              (defstobj-fnname field :init key2 nil)
                               default-names))
                       (t default-names))))))))
 
@@ -18086,10 +18121,15 @@
                                                (cdr (car ftemps))))
                           t)
                     t))
-            (key2 (if (and (consp type)
-                           (eq (car type) 'array))
-                      :array
-                    :non-array))
+            (key2 (defstobj-fnname-key2 type))
+            (boundp-name (defstobj-fnname field :boundp key2 renaming))
+            (accessor?-name (defstobj-fnname field :accessor? key2
+                              renaming))
+            (remove-name (defstobj-fnname field :remove key2
+                           renaming))
+            (count-name (defstobj-fnname field :count key2 renaming))
+            (clear-name (defstobj-fnname field :clear key2 renaming))
+            (init-name (defstobj-fnname field :init key2 renaming))
             (fieldp-name (defstobj-fnname field :recognizer key2 renaming))
             (accessor-name (defstobj-fnname field :accessor key2 renaming))
             (accessor-const-name (defconst-name accessor-name))
@@ -18101,10 +18141,24 @@
         (chk-all-but-new-name accessor-name ctx 'function wrld state)
         (chk-all-but-new-name updater-name ctx 'function wrld state)
         (chk-all-but-new-name accessor-const-name ctx 'const wrld state)
-        (if (eq key2 :array)
-            (er-progn (chk-all-but-new-name length-name ctx 'function wrld state)
-                      (chk-all-but-new-name resize-name ctx 'function wrld state))
-          (value nil))
+        (cond
+         ((eq key2 :array)
+          (er-progn (chk-all-but-new-name length-name ctx 'function wrld state)
+                    (chk-all-but-new-name resize-name ctx 'function wrld state)))
+         ((eq key2 :hash-table)
+          (er-progn (chk-all-but-new-name boundp-name ctx
+                                          'function wrld state)
+                    (chk-all-but-new-name accessor?-name ctx
+                                          'function wrld state)
+                    (chk-all-but-new-name remove-name ctx
+                                          'function wrld state)
+                    (chk-all-but-new-name count-name ctx
+                                          'function wrld state)
+                    (chk-all-but-new-name init-name ctx
+                                          'function wrld state)
+                    (chk-all-but-new-name clear-name ctx
+                                          'function wrld state)))
+         (t (value nil)))
         (chk-acceptable-defstobj1 name field-descriptors (cdr ftemps)
                                   renaming non-memoizable ctx wrld state
                                   (list* fieldp-name
@@ -18114,7 +18168,15 @@
                                              (list* length-name
                                                     resize-name
                                                     names)
-                                           names))
+                                           (if (eq key2 :hash-table)
+                                               (list* boundp-name
+                                                      accessor?-name
+                                                      remove-name
+                                                      count-name
+                                                      clear-name
+                                                      init-name
+                                                      names)
+                                             names)))
                                   (cons accessor-const-name
                                         const-names))))))))
 
@@ -18290,8 +18352,8 @@
 ; before we even bother to check the well-formedness of the renaming alist.
 
             (chk-all-but-new-name name ctx 'stobj wrld state)
-            (cond ((or (eq name 'I)
-                       (eq name 'V))
+            (cond ((member-eq name
+                              '(i v k ht-size rehash-size rehash-threshold))
 
 ; Not only is 'v used in the logical definition of an updater when the field is
 ; not a child stobj (or array of such) -- also 'v is used in the raw definition
@@ -18299,10 +18361,10 @@
 
                    (er soft ctx
                        "DEFSTOBJ does not allow single-threaded objects with ~
-                        the names ~x0 or ~x1 because those symbols are used ~
-                        as formals, along with the new stobj name itself, in ~
+                        the names ~v0, because those symbols may be used as ~
+                        formals, along with the new stobj name itself, in ~
                         ``primitive'' stobj functions that will be defined."
-                       'i 'v))
+                       '(i v k ht-size rehash-size rehash-threshold)))
                   (t (value nil)))
             (chk-legal-defstobj-name name state)
             (cond ((not (doublet-style-symbol-to-symbol-alistp renaming))
@@ -18438,6 +18500,8 @@
              (init (if creator
                        `(non-exec (,creator))
                      (kwote init0)))
+             (hashp (and (consp type) (eq (car type) 'hash-table)))
+             (hash-test (and hashp (cadr type)))
              (array-etype (and arrayp (cadr type)))
              (stobj-formal
               (cond (arrayp (and (not (eq array-etype 'state))
@@ -18451,6 +18515,7 @@
                                `(:stobjs ,stobj-formal)))
              (type-term            ; used in guard
               (and (not arrayp)    ; else type-term is not used
+                   (not hashp)
                    (if (null wrld) ; called from raw Lisp, so guard is ignored
                        t
                      (translate-declaration-to-guard type v-formal wrld))))
@@ -18475,7 +18540,16 @@
                                   :resize-name))
              (resizable (access defstobj-field-template
                                 field-template
-                                :resizable)))
+                                :resizable))
+             (other (access defstobj-field-template
+                            field-template
+                            :other))
+             (boundp-name (nth 0 other))
+             (accessor?-name (nth 1 other))
+             (remove-name (nth 2 other))
+             (count-name (nth 3 other))
+             (clear-name (nth 4 other))
+             (init-name (nth 5 other)))
         (cond
          (arrayp
           (append
@@ -18539,6 +18613,67 @@
                                `(update-nth-array ,n i ,v-formal ,var))))
            (defstobj-field-fns-axiomatic-defs
              top-recog var (+ n 1) (cdr field-templates) wrld)))
+         (hashp
+          (flet ((common-guard (hash-test var top-recog)
+                               (cond ((eq hash-test 'eq)
+                                      `(and (,top-recog ,var)
+                                            (symbolp k)))
+                                     ((eq hash-test 'eql)
+                                      `(and (,top-recog ,var)
+                                            (eqlablep k)))
+                                     (t `(,top-recog ,var)))))
+          (append
+           `((,accessor-name
+              (k ,var)
+              (declare (xargs :guard ,(common-guard hash-test var top-recog)
+                              :verify-guards t))
+              (cdr (hons-assoc-equal k (nth ,n ,var))))
+             (,updater-name
+              (k ,v-formal ,var)
+              (declare (xargs :guard ,(common-guard hash-test var top-recog)
+                              :verify-guards t))
+              (update-nth ,n (cons (cons k ,v-formal) (nth ,n ,var)) ,var))
+             (,boundp-name
+              (k ,var)
+              (declare (xargs :guard ,(common-guard hash-test var top-recog)
+                              :verify-guards t))
+              (consp (hons-assoc-equal k (nth ,n ,var))))
+             (,accessor?-name
+
+              (k ,var)
+              (declare (xargs :guard ,(common-guard hash-test var top-recog)
+                              :verify-guards t))
+              (mv (,accessor-name k ,var)
+                  (,boundp-name k ,var)))
+             (,remove-name
+              (k ,var)
+              (declare (xargs :guard ,(common-guard hash-test var top-recog)
+                              :verify-guards t))
+              (update-nth ,n (hons-remove-assoc k (nth ,n ,var)) ,var))
+             (,count-name
+              (,var)
+              (declare (xargs :guard (,top-recog ,var)))
+              (count-keys (nth ,n ,var)))
+             (,clear-name
+              (,var)
+              (declare (xargs :guard (,top-recog ,var)))
+              (update-nth ,n nil ,var))
+             (,init-name
+              (ht-size rehash-size rehash-threshold ,var)
+              (declare (xargs :guard (and (,top-recog ,var)
+                                          (or (natp ht-size)
+                                              (not ht-size))
+                                          (or (and (rationalp rehash-size)
+                                                   (<= 1 rehash-size))
+                                              (not rehash-size))
+                                          (or (and (rationalp rehash-threshold)
+                                                   (<= 0 rehash-threshold)
+                                                   (<= rehash-threshold 1))
+                                              (not rehash-threshold))))
+                       (ignorable ht-size rehash-size rehash-threshold))
+              (update-nth ,n nil ,var)))
+           (defstobj-field-fns-axiomatic-defs
+             top-recog var (+ n 1) (cdr field-templates) wrld))))
          (t
           (append
            `((,accessor-name (,var)
@@ -18578,6 +18713,7 @@
                            field-template
                            :type))
              (arrayp (and (consp type) (eq (car type) 'array)))
+             (hashp (and (consp type) (eq (car type) 'hash-table)))
              (array-size (and arrayp (car (caddr type))))
              (init0 (access defstobj-field-template
                             field-template
@@ -18590,6 +18726,9 @@
         (cond
          (arrayp
           (cons `(make-list ,array-size :initial-element ,init)
+                (defstobj-axiomatic-init-fields (cdr field-templates) wrld)))
+         (hashp
+          (cons nil
                 (defstobj-axiomatic-init-fields (cdr field-templates) wrld)))
          (t ; whether the type is given or not is irrelevant
           (cons init
@@ -18664,7 +18803,16 @@
              (length-fn (access defstobj-field-template field-template
                                 :length-name))
              (resize-fn (access defstobj-field-template field-template
-                                :resize-name)))
+                                :resize-name))
+             (other (access defstobj-field-template
+                            field-template
+                            :other))
+             (boundp-fn (nth 0 other))
+             (accessor?-fn (nth 1 other))
+             (remove-fn (nth 2 other))
+             (count-fn (nth 3 other))
+             (clear-fn (nth 4 other))
+             (init-fn (nth 5 other)))
         (put-stobjs-in-and-outs1
          name
          (cdr field-templates)
@@ -18688,6 +18836,32 @@
                    upd-fn 'stobjs-in (list nil stobj-flg name)
                    (putprop
                     upd-fn 'stobjs-out (list name) wrld)))))))))
+          ((and (consp type)
+                (eq (car type) 'hash-table))
+           (putprop
+            init-fn 'stobjs-in (list nil nil nil name)
+            (putprop
+             init-fn 'stobjs-out (list name)
+             (putprop
+              clear-fn 'stobjs-in (list name)
+              (putprop
+               clear-fn 'stobjs-out (list name)
+               (putprop
+                count-fn 'stobjs-in (list name)
+                (putprop
+                 remove-fn 'stobjs-in (list nil name)
+                 (putprop
+                  remove-fn 'stobjs-out (list name)
+                  (putprop
+                   accessor?-fn 'stobjs-in (list nil name)
+                   (putprop
+                    boundp-fn 'stobjs-in (list nil name)
+                    (putprop
+                     acc-fn 'stobjs-in (list nil name)
+                     (putprop
+                      upd-fn 'stobjs-in (list nil nil name)
+                      (putprop
+                       upd-fn 'stobjs-out (list name) wrld)))))))))))))
           (t
            (let ((stobj-flg (and (stobjp type t wrld)
                                  type)))
@@ -18712,14 +18886,22 @@
 
 ; Relevant functions and their settings:
 
-;      fn                  stobjs-in         stobjs-out
-; topmost recognizer       (name)            (nil)
-; creator                  ()                (name)
-; field recogs             (nil ...)         (nil)
-; simple accessor          (name)            (nil)
-; array accessor           (nil name)        (nil)
-; simple updater           (nil name)        (name)
-; array updater            (nil nil name)    (name)
+;      fn                  stobjs-in          stobjs-out
+; topmost recognizer       (name)             (nil)
+; creator                  ()                 (name)
+; field recogs             (nil ...)          (nil)
+; simple accessor          (name)             (nil)
+; hash-table accessor      (nil name)         (nil)
+; array accessor           (nil name)         (nil)
+; simple updater           (nil name)         (name)
+; hash-table updater       (nil nil name)     (name)
+; array updater            (nil nil name)     (name)
+; hash-table boundp        (nil name)         (nil nil)
+; hash-table accessor?     (nil name)         (nil nil)
+; hash-table remove        (nil name)         (name)
+; hash-table count         (name)             (nil)
+; hash-table clear         (name)             (name)
+; hash-table init          (nil nil nil name) (name)
 
 ; The entries above not involving name were correctly computed before
 ; we knew that name was a stobj and hence are correct in wrld now.
@@ -19316,31 +19498,27 @@
 
                         creator exports)))
     (mv-let
-     (erp methods)
+      (erp methods)
 
 ; Each method has only the :NAME, :LOGIC, :EXEC, and :PROTECT fields filled in
 ; (the others are nil).  But that suffices for the present purposes.
 
-     (simple-translate-absstobj-fields
-      name st$c
+      (simple-translate-absstobj-fields
+       name st$c
 
 ; See the comment above about the first two fields of the computed methods
 ; being for the recognizer and creator.
 
-      fields
-      '(:RECOGNIZER :CREATOR) ; other types are nil
-      protect-default
-      nil ; safe value, probably irrelevant in raw Lisp
-      )
-     (cond
-      (erp (interface-er "~@0" methods))
-      (t
-       `(progn
-
-; We place the defvar above the subsequent let*, in order to avoid
-; warnings in Lisps such as CCL that compile on-the-fly.
-
-          (defvar ,the-live-name)
+       fields
+       '(:RECOGNIZER :CREATOR) ; other types are nil
+       protect-default
+       nil ; safe value, probably irrelevant in raw Lisp
+       )
+      (cond
+       (erp (interface-er "~@0" methods))
+       (t
+        (let ((init-form (defabsstobj-raw-init creator-name methods)))
+          `(progn
 
 ; For defstobj, we lay down a defg form for the variable (st-lst name).  Here,
 ; we do not do so, because memoize-fn collects st-lst values based on
@@ -19353,48 +19531,42 @@
 ; discussion of abstract stobjs in comments in memoize-fn.  So there is no defg
 ; form to lay down here.
 
-          ,@(mapcar (function (lambda (def)
-                                (cons 'DEFMACRO def)))
+             ,@(mapcar (function (lambda (def)
+                                   (cons 'DEFMACRO def)))
 
 ; See the comment above in the binding of fields, about a guarantee that the
 ; first two methods must be for the recognizer and creator, respectively.
 
-                    (defabsstobj-raw-defs name methods))
-          (let* ((boundp (boundp ',the-live-name))
-                 (d (and boundp
-                         (get ',the-live-name
-                              'redundant-raw-lisp-discriminator)))
-                 (ok-p (and boundp
-                            (equal d ',event-form))))
-            (cond
-             (ok-p ',name)
-             ((and boundp (not (raw-mode-p *the-live-state*)))
-              (interface-er
-               "Illegal attempt to redeclare the (abstract) single-threaded ~
-                object ~s0."
-               ',name))
-             (t
-              (setf ,the-live-name
-                ,(defabsstobj-raw-init creator-name methods))
-              (setf (get ',the-live-name 'redundant-raw-lisp-discriminator)
-                    ',event-form)
-              (let ((old (and boundp ; optimization (as for defstobj)
-                              (assoc-eq ',name *user-stobj-alist*))))
-                (cond
-                 (old ; hence raw-mode
-                  (fms "Note:  Redefining and reinitializing (abstract) stobj ~
-                        ~x0 in raw mode.~%"
-                       (list (cons #\0 ',name))
-                       (standard-co *the-live-state*) *the-live-state* nil)
-                  (setf (cdr old)
-                        (symbol-value ',the-live-name)))
-                 (t
-                  (assert$
-                   (not (assoc-eq ',name *user-stobj-alist*))
-                   (setq *user-stobj-alist*
-                         (cons (cons ',name (symbol-value ',the-live-name))
-                               *user-stobj-alist*))))))
-              ',name)))))))))
+                       (defabsstobj-raw-defs name methods))
+             (let* ((old-pair (assoc-eq ',name *user-stobj-alist*))
+                    (d (and old-pair
+                            (get ',the-live-name
+                                 'redundant-raw-lisp-discriminator)))
+                    (ok-p (and old-pair
+                               (equal d ',event-form))))
+               (cond
+                (ok-p ',name)
+                ((and old-pair (not (raw-mode-p *the-live-state*)))
+                 (interface-er
+                  "Illegal attempt to redeclare the (abstract) ~
+                   single-threaded object ~s0."
+                  ',name))
+                (t
+                 (setf (get ',the-live-name 'redundant-raw-lisp-discriminator)
+                       ',event-form)
+                 (cond (old-pair ; hence raw-mode
+                        (fms "Note:  Redefining and reinitializing (abstract) ~
+                              stobj ~x0 in raw mode.~%"
+                             (list (cons #\0 ',name))
+                             (standard-co *the-live-state*)
+                             *the-live-state*
+                             nil)
+                        (setf (cdr old-pair) ,init-form))
+                       (t
+                        (setq *user-stobj-alist*
+                              (cons (cons ',name ,init-form)
+                                    *user-stobj-alist*))))
+                 ',name))))))))))
 
 #+acl2-loop-only
 (defmacro defabsstobj (&whole event-form
@@ -20593,6 +20765,8 @@
                        (saved (svref temp 0)))
                   (declare (type simple-array temp))
                   (cond
+                   ((eq saved :ignore)
+                    ,(cons ',exec args))
                    ((eql saved 0) ; optimization of next case
                     (setf (svref temp 0) 1)
                     (our-multiple-value-prog1

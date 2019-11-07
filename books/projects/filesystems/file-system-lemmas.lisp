@@ -186,9 +186,11 @@
   (equal (subsetp-equal (binary-append x y) z)
          (and (subsetp-equal x z) (subsetp-equal y z))))
 
-(defthm subsetp-is-transitive
-  (implies (and (subsetp-equal x y) (subsetp-equal y z))
-           (subsetp-equal x z)))
+;; The following is redundant with the eponymous theorem in
+;; books/std/lists/sets.lisp, from where it was taken with thanks.
+(defthm subsetp-trans
+  (implies (and (subsetp x y) (subsetp y z))
+           (subsetp x z)))
 
 ;; The following is redundant with the eponymous theorem in
 ;; books/std/lists/sets.lisp, from where it was taken with thanks.
@@ -667,12 +669,6 @@
          (nthcdr (+ (nfix a) (nfix b)) x))
   :hints(("goal" :induct (nthcdr b x))))
 
-(defthm last-of-member-equal
-  (equal (last (member-equal x lst))
-         (if (member-equal x lst)
-             (last lst)
-           nil)))
-
 (defthm acl2-count-of-member-equal
   (<= (acl2-count (member-equal x lst))
       (acl2-count lst))
@@ -755,10 +751,23 @@
 
 (defthm
   put-assoc-equal-without-change
-  (implies (consp (assoc-equal x alist))
-           (equal (put-assoc-equal x (cdr (assoc-equal x alist))
-                                   alist)
-                  alist)))
+  (implies (consp (assoc-equal name alist))
+           (iff (equal (put-assoc-equal name val alist)
+                       alist)
+                (equal (cdr (assoc-equal name alist))
+                       val)))
+  :rule-classes
+  ((:rewrite
+    :corollary (implies (and (consp (assoc-equal name alist))
+                             (not (equal (cdr (assoc-equal name alist))
+                                         val)))
+                        (not (equal (put-assoc-equal name val alist)
+                                    alist))))
+   (:rewrite :corollary (implies (and (consp (assoc-equal name alist))
+                                      (equal (cdr (assoc-equal name alist))
+                                             val))
+                                 (equal (put-assoc-equal name val alist)
+                                        alist)))))
 
 ;; Contributed to books/std/lists/remove1-equal.lisp
 (defthm member-equal-of-remove1-equal
@@ -798,12 +807,12 @@
 
 (defthm
   member-of-strip-cars-of-remove-assoc
-  (implies
-   (not (member-equal x1 (strip-cars alist)))
-   (not
-    (member-equal x1
-                  (strip-cars (remove-assoc-equal x2 alist)))))
-  :rule-classes (:rewrite :type-prescription))
+  (iff
+   (member-equal x1
+                 (strip-cars (remove-assoc-equal x2 alist)))
+   (and
+    (member-equal x1 (strip-cars alist))
+    (not (equal x1 x2)))))
 
 (defthm
   no-duplicatesp-of-strip-cars-of-remove-assoc
@@ -822,15 +831,15 @@
            (equal (len (remove-equal x l))
                   (if (member-equal x l)
                       (- (len l) 1)
-                      (len l)))))
+                    (len l)))))
 
 (defthm no-duplicatesp-of-remove
   (implies (no-duplicatesp-equal l)
            (no-duplicatesp-equal (remove-equal x l))))
 
-(defthmd assoc-of-car-when-member
-     (implies (and (member-equal x lst) (alistp lst))
-              (consp (assoc-equal (car x) lst))))
+(defthm assoc-of-car-when-member
+  (implies (and (member-equal x lst) (alistp lst))
+           (consp (assoc-equal (car x) lst))))
 
 (encapsulate
   ()
@@ -846,9 +855,7 @@
 
   (local
    (defthm take-of-make-list-ac-lemma-1
-     (implies (and (not (zp n1))
-                   (not (zp n2))
-                   (<= n1 n2))
+     (implies (not (zp n1))
               (equal (cons val (make-list-ac (+ -1 n1) val nil))
                      (make-list-ac n1 val nil)))
      :hints (("Goal" :in-theory (disable cons-car-cdr make-list-ac)
@@ -860,3 +867,123 @@
              (equal (take n1 (make-list-ac n2 val ac))
                     (make-list-ac n1 val nil)))
     :hints (("goal" :induct (dec-dec-induct n1 n2)))))
+
+(defthm
+  remove-assoc-when-absent
+  (implies (and (alistp alist)
+                (atom (assoc-equal x alist)))
+           (equal (remove-assoc-equal x alist)
+                  alist)))
+
+(defthm stringp-of-append
+  (equal (stringp (append x y)) (and (atom x) (stringp y))))
+
+(defthm remove-assoc-equal-of-put-assoc-equal
+  (equal (remove-assoc key (put-assoc name val alist))
+         (if
+             (equal key name)
+             (remove-assoc key alist)
+           (put-assoc name val (remove-assoc key alist)))))
+
+(defthm last-of-member-equal
+  (equal (last (member-equal x lst))
+         (if (member-equal x lst)
+             (last lst)
+           nil)))
+
+(defthm integerp-of-car-of-last-when-integer-listp
+  (implies (and (integer-listp l) (consp l))
+           (integerp (car (last l)))))
+
+(defthm non-negativity-of-car-of-last-when-nat-listp
+  (implies (nat-listp l)
+           (<= 0 (car (last l))))
+  :rule-classes :linear)
+
+(defthm len-of-put-assoc-equal
+  (implies (not (null name))
+           (equal (len (put-assoc-equal name val alist))
+                  (if (consp (assoc-equal name alist))
+                      (len alist)
+                      (+ 1 (len alist))))))
+
+(defthm len-of-remove-assoc-equal-2
+  (implies (and (not (null x))
+                (atom (assoc-equal x alist)))
+           (equal (remove-assoc-equal x alist)
+                  (true-list-fix alist))))
+
+(defthm len-of-remove-assoc-equal-1
+  (implies (and (not (null x))
+                (consp (assoc-equal x alist)))
+           (< (len (remove-assoc-equal x alist))
+              (len alist)))
+  :rule-classes :linear)
+
+(defthm strip-cars-of-remove-assoc
+  (equal (strip-cars (remove-assoc-equal x alist))
+         (remove-equal x (strip-cars alist))))
+
+(defthm strip-cars-of-put-assoc
+  (implies (consp (assoc-equal name alist))
+           (equal (strip-cars (put-assoc-equal name val alist))
+                  (strip-cars alist))))
+
+(defthm
+  member-of-strip-cars t
+  :rule-classes
+  ((:type-prescription
+    :corollary (implies (consp (assoc-equal x alist))
+                        (member-equal x (strip-cars alist))))
+   (:type-prescription
+    :corollary
+    (implies (and (not (null x))
+                  (not (consp (assoc-equal x alist))))
+             (not (member-equal x (strip-cars alist)))))))
+
+(defthm remove-when-absent
+  (implies (not (member-equal x l))
+           (equal (remove-equal x l)
+                  (true-list-fix l))))
+
+(defthmd intersectp-when-member
+  (implies (member-equal x l)
+           (iff (intersectp-equal l y)
+                (or (intersectp-equal (remove-equal x l) y)
+                    (member-equal x y))))
+  :hints (("goal" :in-theory (e/d (intersectp-equal)
+                                  (intersectp-is-commutative)))))
+
+(defthm consp-of-assoc-equal-of-append
+  (implies (not (null name))
+           (equal (consp (assoc-equal name (append x y)))
+                  (or (consp (assoc-equal name x))
+                      (consp (assoc-equal name y))))))
+
+(defthm consp-of-assoc-of-remove
+  (implies (and (not (null x1))
+                (not (consp (assoc-equal x1 l))))
+           (not (consp (assoc-equal x1 (remove-equal x2 l)))))
+  :rule-classes :type-prescription)
+
+(defthm strip-cars-of-append
+  (equal (strip-cars (append x y))
+         (append (strip-cars x) (strip-cars y))))
+
+(defthm remove-of-append
+  (equal (remove-equal x1 (append x2 y))
+         (append (remove-equal x1 x2)
+                 (remove-equal x1 y))))
+
+(defthm
+  remove-of-strip-cars-of-remove
+  (implies (atom x)
+           (equal (remove-equal nil (strip-cars (remove-equal x alist)))
+                  (remove-equal nil (strip-cars alist)))))
+
+(defthm assoc-equal-of-append-1
+  (implies (not (null x1))
+           (equal (assoc-equal x1 (append x2 y))
+                  (if (consp (assoc-equal x1 x2))
+                      (assoc-equal x1 x2)
+                      (assoc-equal x1 y)))))
