@@ -152,6 +152,33 @@
                         (cons a (intersection$ x y))
                       (intersection$ x y)))
    :hints(("Goal" :in-theory (enable acl2::set-equiv)))))
+
+(defthm
+  len-of-intersection-equal-of-remove-duplicatesp-equal-left-cons-right-under-set-equiv
+  (equal (len (intersection-equal (remove-duplicates-equal x)
+                                  (cons a y)))
+         (if (member-equal a (remove-duplicates-equal x))
+             (len (remove-duplicates-equal
+                   (cons a
+                         (intersection-equal (remove-duplicates-equal x)
+                                             y))))
+             (len (intersection-equal (remove-duplicates-equal x)
+                                      y))))
+  :instructions
+  ((:dive 1)
+   (:rewrite
+    acl2::set-equiv-implies-equal-len-1-when-no-duplicatesp
+    ((y (if (member-equal a (remove-duplicates-equal x))
+            (remove-duplicates-equal
+             (cons a
+                   (intersection-equal (remove-duplicates-equal x)
+                                       y)))
+            (intersection-equal (remove-duplicates-equal x)
+                                y)))))
+   :top :s
+   :bash :bash
+   :split (:change-goal nil t)
+   :bash :bash))
 ;; ----------------------------------------------------------------------
 
 (defxdoc instant-runoff-voting
