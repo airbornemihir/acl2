@@ -49,7 +49,109 @@
 (local (include-book "std/lists/nth"  :dir :system))
 (local (include-book "arithmetic/top-with-meta" :dir :system))
 
-(local (in-theory (disable acl2::set-equiv-implies-equal-len-remove-duplicates-equal)))
+(skip-proofs
+ (defthm remove-duplicates-equal-of-append
+   (equal (remove-duplicates-equal (append x y))
+          (append (set-difference-equal (remove-duplicates-equal x)
+                                        y)
+                  (remove-duplicates-equal y)))))
+
+(skip-proofs
+ (defthm len-of-set-difference-equal
+   (equal (len (set-difference-equal x y))
+          (- (len x)
+             (len (intersection-equal x y))))))
+
+(defthm zp-len-remove-duplicates-equal (equal (equal (len (remove-duplicates-equal x)) 0)
+                                              (equal (len x) 0)))
+
+(skip-proofs
+ (defthm intersectp-is-commutative
+   (equal (intersectp-equal x y)
+          (intersectp-equal y x))))
+
+(defthm
+  remove-duplicates-equal-of-intersection-equal
+  (equal (remove-duplicates-equal (intersection-equal x y))
+         (intersection-equal (remove-duplicates-equal x)
+                             y)))
+
+(defthm
+  remove-duplicates-equal-of-intersection-equal
+  (equal (remove-duplicates-equal (intersection-equal x y))
+         (intersection-equal (remove-duplicates-equal x)
+                             y)))
+
+(skip-proofs
+ (defthm intersection-is-commutative
+   (acl2::set-equiv (intersection-equal x y)
+                    (intersection-equal y x))))
+
+(defthm intersection-equal-of-remove-duplicates-equal-inner-commutativity
+  (acl2::set-equiv
+   (intersection-equal (remove-duplicates-equal x)
+                       y)
+   (intersection-equal (remove-duplicates-equal y)
+                       x))
+  :hints (("Goal" :do-not-induct t
+           :in-theory (disable
+                       remove-duplicates-equal-of-intersection-equal)
+           :use (remove-duplicates-equal-of-intersection-equal
+                 (:instance
+                  remove-duplicates-equal-of-intersection-equal
+                  (x y) (y x))))))
+
+(defthm no-duplicatesp-equal-of-intersection-equal
+  (implies (no-duplicatesp-equal x)
+           (no-duplicatesp-equal (intersection-equal x y))))
+
+(defthm len-intersection-equal-of-remove-duplicates-equal-inner-commutativity
+  (equal
+   (len
+    (intersection-equal (remove-duplicates-equal x)
+                        y))
+   (len
+    (intersection-equal (remove-duplicates-equal y)
+                        x)))
+  :hints
+  (("goal" :do-not-induct t
+    :use
+    (:instance
+     (:rewrite acl2::set-equiv-implies-equal-len-1-when-no-duplicatesp)
+     (x (intersection-equal (remove-duplicates-equal x)
+                            y))
+     (y (intersection-equal (remove-duplicates-equal y)
+                            x))))))
+
+(defthm
+  set-equiv-implies-equal-len-of-intersection-equal-of-remove-duplicates-equal-2
+  (implies
+   (acl2::set-equiv y y-equiv)
+   (equal
+    (len
+     (intersection-equal (remove-duplicates-equal x)
+                         y))
+    (len
+     (intersection-equal (remove-duplicates-equal x)
+                         y-equiv))))
+  :hints
+  (("goal" :do-not-induct t
+    :use
+    (:instance
+     (:rewrite acl2::set-equiv-implies-equal-len-1-when-no-duplicatesp)
+     (x (intersection-equal (remove-duplicates-equal x)
+                            y))
+     (y (intersection-equal (remove-duplicates-equal x)
+                            y-equiv)))))
+  :rule-classes :congruence)
+
+(skip-proofs
+ (defthm intersection$-of-cons-right-under-set-equiv
+   (acl2::set-equiv (intersection$ x (cons a y))
+                    (if (member a x)
+                        (cons a (intersection$ x y))
+                      (intersection$ x y)))
+   :hints(("Goal" :in-theory (enable acl2::set-equiv)))))
 ;; ----------------------------------------------------------------------
 
 (defxdoc instant-runoff-voting
