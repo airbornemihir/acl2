@@ -18325,7 +18325,7 @@ evaluated.  See :DOC certify-book, in particular, the discussion about ``Step
                               (<= 0 start)
                               (<= start end))
                   :mode :program))
-  (take (- end start)
+  (take (- end (mbe :exec start :logic (nfix start)))
         (nthcdr start lst)))
 
 #+acl2-loop-only
