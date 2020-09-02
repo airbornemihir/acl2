@@ -53,15 +53,15 @@ ability to write nice rules about @('subseq-list').</p>
 
   (defthm len-of-subseq-list
     (equal (len (subseq-list x start end))
-           (nfix (- end start))))
+           (nfix (- end (nfix start)))))
 
   (defthm consp-of-subseq-list
     (equal (consp (subseq-list x start end))
-           (posp (- end start))))
+           (posp (- end (nfix start)))))
 
   (defthm subseq-list-under-iff
     (iff (subseq-list x start end)
-         (posp (- end start))))
+         (posp (- end (nfix start)))))
 
   (defthm subseq-list-of-list-fix
     (equal (subseq-list (list-fix x) start end)

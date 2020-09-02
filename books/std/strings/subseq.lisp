@@ -46,7 +46,7 @@
 
 (defthm len-of-subseq-list
   (equal (len (subseq-list x start end))
-         (nfix (- end start))))
+         (nfix (- end (nfix start)))))
 
 (defthm true-listp-subseq-list
   (true-listp (subseq-list x start end))
@@ -58,10 +58,10 @@
 
 (defthm length-of-subseq
   (equal (length (subseq x start end))
-         (nfix (- (or end (length x)) start))))
+         (nfix (- (or end (length x)) (nfix start)))))
 
 (defthm len-of-subseq
   (equal (len (subseq x start end))
          (if (stringp x)
              0
-           (nfix (- (or end (len x)) start)))))
+           (nfix (- (or end (len x)) (nfix start))))))

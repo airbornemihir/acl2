@@ -198,8 +198,8 @@
      (471 467 (:REWRITE DEFAULT-+-1))
      (465 10
           (:REWRITE BY-SLICE-YOU-MEAN-THE-WHOLE-CAKE-2))
-     (320 276 (:REWRITE DEFAULT-<-2))
-     (298 276 (:REWRITE DEFAULT-<-1))
+     (322 278 (:REWRITE DEFAULT-<-2))
+     (300 278 (:REWRITE DEFAULT-<-1))
      (255 10 (:REWRITE CONSP-OF-NTHCDR))
      (224 32 (:DEFINITION L2-TO-L1-FS))
      (141 141 (:REWRITE ZP-OPEN))
@@ -209,8 +209,7 @@
      (101 101 (:REWRITE DEFAULT-COERCE-2))
      (101 96 (:REWRITE DEFAULT-COERCE-1))
      (99 52 (:REWRITE NON-NIL-NTH))
-     (86 18 (:DEFINITION NFIX))
-     (80 80 (:REWRITE MEMBER-OF-A-NAT-LIST))
+     (82 82 (:REWRITE MEMBER-OF-A-NAT-LIST))
      (79 16
          (:REWRITE L2-STAT-CORRECTNESS-1-LEMMA-4))
      (72 72 (:REWRITE FOLD-CONSTS-IN-+))
@@ -564,12 +563,12 @@
                        (60 12 (:DEFINITION ASSOC-EQUAL))
                        (55 3 (:REWRITE DEFAULT-COERCE-3))
                        (40 22 (:REWRITE DEFAULT-+-2))
-                       (34 25 (:REWRITE DEFAULT-<-2))
+                       (35 26 (:REWRITE DEFAULT-<-2))
                        (30 3
                            (:REWRITE L2-WRCHS-RETURNS-FS-LEMMA-3))
                        (30 3
                            (:REWRITE L2-STAT-CORRECTNESS-1-LEMMA-5))
-                       (26 25 (:REWRITE DEFAULT-<-1))
+                       (27 26 (:REWRITE DEFAULT-<-1))
                        (26 18 (:DEFINITION NTH))
                        (24 22 (:REWRITE DEFAULT-+-1))
                        (24 3 (:REWRITE L2-FS-P-ASSOC))
@@ -579,7 +578,7 @@
                        (16 16 (:REWRITE DEFAULT-COERCE-1))
                        (16 8 (:REWRITE NON-NIL-NTH))
                        (13 1 (:DEFINITION NTHCDR))
-                       (5 5 (:REWRITE MEMBER-OF-A-NAT-LIST))
+                       (6 6 (:REWRITE MEMBER-OF-A-NAT-LIST))
                        (5 5 (:REWRITE FOLD-CONSTS-IN-+))
                        (4 4
                           (:REWRITE L2-READ-AFTER-WRITE-2-LEMMA-2))
@@ -615,9 +614,9 @@
      (467 323 (:REWRITE DEFAULT-+-2))
      (428 8
           (:REWRITE BY-SLICE-YOU-MEAN-THE-WHOLE-CAKE-2))
-     (334 259 (:REWRITE DEFAULT-<-2))
+     (336 261 (:REWRITE DEFAULT-<-2))
      (326 323 (:REWRITE DEFAULT-+-1))
-     (268 259 (:REWRITE DEFAULT-<-1))
+     (270 261 (:REWRITE DEFAULT-<-1))
      (236 8 (:REWRITE CONSP-OF-NTHCDR))
      (153 153 (:REWRITE DEFAULT-COERCE-2))
      (148 148
@@ -626,10 +625,9 @@
      (136 136
           (:TYPE-PRESCRIPTION TRUE-LISTP-NTHCDR-TYPE-PRESCRIPTION))
      (114 114 (:REWRITE ZP-OPEN))
-     (109 109 (:REWRITE MEMBER-OF-A-NAT-LIST))
+     (111 111 (:REWRITE MEMBER-OF-A-NAT-LIST))
      (90 15 (:DEFINITION REMOVE1-ASSOC-EQUAL))
      (77 3 (:REWRITE LEN-OF-NTHCDR))
-     (67 14 (:DEFINITION NFIX))
      (32 4 (:DEFINITION NTHCDR))
      (24 8 (:DEFINITION SYMBOL-LISTP))
      (18 18 (:REWRITE FOLD-CONSTS-IN-+))
@@ -695,11 +693,10 @@
      (468 459 (:REWRITE DEFAULT-+-1))
      (348 348
           (:TYPE-PRESCRIPTION TRUE-LISTP-NTHCDR-TYPE-PRESCRIPTION))
-     (308 280 (:REWRITE DEFAULT-<-1))
-     (298 280 (:REWRITE DEFAULT-<-2))
+     (320 292 (:REWRITE DEFAULT-<-1))
+     (310 292 (:REWRITE DEFAULT-<-2))
      (294 12 (:REWRITE LEN-OF-NTHCDR))
-     (237 237 (:REWRITE MEMBER-OF-A-NAT-LIST))
-     (228 48 (:DEFINITION NFIX))
+     (249 249 (:REWRITE MEMBER-OF-A-NAT-LIST))
      (228 3
           (:REWRITE L2-STAT-CORRECTNESS-1-LEMMA-3))
      (187 187 (:TYPE-PRESCRIPTION L2-CREATE))
