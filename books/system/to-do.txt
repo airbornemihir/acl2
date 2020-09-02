@@ -824,3 +824,15 @@ and then checking their accuracy at the end of the build.  See
 function check-built-in-constants in interface-raw.lisp.
 
 <><><><><><><><><><><><><><><><><><><><><><><><><>
+
+{{Fix the start argument of (subseq-list lst start end) to a natural
+number using MBE.}}
+
+Rules about, say, (subseq-list (string-append str1 str2) start end)
+will be more concise with such a fixing, which is already supported by
+the guard of subseq-list.
+
+Note that others seem to independently have noted the desirability
+of doing this in :doc subseq-list.
+
+<><><><><><><><><><><><><><><><><><><><><><><><><>
